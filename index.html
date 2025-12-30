@@ -1,0 +1,2211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>思熹的软件工具助手 v3.55</title>
+    
+    <!-- 1. 核心样式 -->
+    <style>
+        :root {
+            /* 默认修改为温柔粉 (Pink) 色系 */
+            --bg-color: #fff1f2;
+            --text-color: #881337;
+            --header-bg: #fff1f2;
+            --header-border: #fecdd3;
+            --card-bg: #ffffff;
+            --card-border: #ffe4e6;
+            --accent-color: #fb7185; /* Pink 500 */
+            --accent-bg: #ffe4e6;
+            
+            /* 热力图颜色等级变量 */
+            --hm-past: #94a3b8;   /* 过去空记录：深灰 */
+            --hm-future: #e2e8f0; /* 未来：浅灰 */
+            --hm-today: var(--accent-bg); /* 今天空记录：浅主题色 */
+            
+            /* 专注等级颜色 */
+            --hm-lv1: var(--accent-color); /* 0-1小时：主题色 */
+            --hm-lv2: #be123c;             /* 1-2小时：Rose 700 */
+            --hm-max: #000000;             /* >2小时：极致黑 */
+        }
+
+        /* 修复抖动核心代码：强制滚动条占位 */
+        html {
+            overflow-y: scroll; /* 无论内容长短，永远保留滚动条轨道 */
+        }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.5s ease, color 0.5s ease;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden; 
+        }
+
+        body.modal-open {
+            overflow: hidden;
+            padding-right: 0px !important; /* 防止模态框打开时再次引起抖动 */
+        }
+
+        .container-max { max-width: 1152px; margin: 0 auto; padding: 0 16px; }
+
+        .app-header {
+            position: sticky; top: 0; z-index: 50;
+            background-color: var(--header-bg);
+            border-bottom: 1px solid var(--header-border);
+            padding: 12px 0 0 0;
+            transition: background-color 0.5s ease, border-color 0.5s ease;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            padding: 24px 0 80px 0;
+        }
+
+        .card-item {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 24px;
+            /* 固定卡片高度 250px */
+            height: 250px;
+            display: flex; flex-direction: column; position: relative;
+            transition: transform 0.2s, box-shadow 0.2s, background-color 0.5s ease;
+            cursor: pointer; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .card-item:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+        .card-item.is-dragging { opacity: 0.5; border: 2px dashed var(--accent-color); box-shadow: none; transform: scale(0.98); }
+        .card-item.disabled-drag { cursor: pointer; } 
+        .card-item.disabled-drag:hover { transform: none; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+
+        /* 卡片内容区域自适应高度与滚动 */
+        .card-content-fixed {
+            flex: 1; 
+            overflow-y: auto;
+            margin-bottom: 12px;
+            padding-right: 2px;
+            min-height: 0; 
+            scrollbar-width: thin; 
+            scrollbar-color: var(--header-border) transparent;
+        }
+        
+        /* 统一的滚动条样式 */
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: var(--header-border); border-radius: 4px; }
+        .custom-scrollbar:hover::-webkit-scrollbar-thumb { background-color: var(--accent-color); }
+        
+        /* 应用统一滚动条到内容区 */
+        .card-content-fixed::-webkit-scrollbar { width: 4px; }
+        .card-content-fixed::-webkit-scrollbar-track { background: transparent; }
+        .card-content-fixed::-webkit-scrollbar-thumb { background-color: var(--header-border); border-radius: 4px; }
+        .card-content-fixed:hover::-webkit-scrollbar-thumb { background-color: var(--accent-color); }
+
+        .card-pinned { }
+        
+        .card-hard {
+            box-shadow: 0 0 0 1px #f43f5e, 0 4px 6px -1px rgba(244, 63, 94, 0.2);
+            border-color: #f43f5e !important;
+        }
+        .dark .card-hard {
+            box-shadow: 0 0 0 1px #be123c, 0 4px 6px -1px rgba(190, 18, 60, 0.3);
+            border-color: #be123c !important;
+        }
+
+        .category-btn {
+            transition: all 0.2s ease;
+        }
+        .category-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px -1px rgba(0, 0, 0, 0.1);
+            background-color: var(--card-bg) !important;
+            z-index: 10;
+        }
+        
+        .filter-btn {
+             transition: all 0.2s ease;
+        }
+        .filter-btn.hover {
+            transform: translateY(-1px);
+        }
+        .filter-btn.active {
+            transform: translateY(1px);
+            box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+        }
+
+        .blur-content { filter: blur(6px); transition: filter 0.3s ease; user-select: none; opacity: 0.8; }
+        .blur-content:hover { filter: blur(0); opacity: 1; }
+
+        .btn-icon {
+            padding: 8px; border-radius: 9999px; border: none; background: transparent;
+            cursor: pointer; color: inherit; transition: all 0.2s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .btn-icon:hover { background-color: rgba(128,128,128,0.1); }
+        
+        .search-input {
+            width: 100%; padding: 10px 16px 10px 40px; border-radius: 12px;
+            border: 1px solid transparent; background-color: var(--card-bg);
+            color: var(--text-color); font-size: 14px; outline: none;
+            transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .search-input:focus { box-shadow: 0 0 0 2px var(--accent-color); }
+
+        .scroll-container {
+            display: flex; overflow-x: auto; gap: 10px; padding: 4px; margin: -4px;
+            scrollbar-width: none;
+        }
+        .scroll-container::-webkit-scrollbar { display: none; }
+
+        #app-loading {
+            position: fixed; inset: 0; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center;
+            background-color: #fff1f2; /* 初始粉色背景 */
+            z-index: 9999; transition: opacity 0.5s;
+            color: #881337;
+        }
+        .spinner {
+            width: 40px; height: 40px; border: 3px solid rgba(0,0,0,0.1);
+            border-radius: 50%; border-top-color: #fb7185; /* 初始粉色 Spinner */
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .toast-container { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 100; pointer-events: none; }
+        .toast-content {
+            background-color: var(--accent-color); color: white; padding: 8px 24px;
+            border-radius: 9999px; font-size: 14px; font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            animation: fadeUp 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+        }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .hide-scroll::-webkit-scrollbar { display: none; }
+
+        .timer-circle-path {
+            transition: stroke-dashoffset 1s linear;
+        }
+        
+        .group:hover .hover-text-accent {
+            color: var(--accent-color);
+        }
+
+        /* 1. 修复：保留原 Tooltip 专用动画 (带 translateX(-50%)) */
+        .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px) translateX(-50%); } to { opacity: 1; transform: translateY(0) translateX(-50%); } }
+
+        /* 1. 修复：新增普通元素浮现动画 (不带 translateX 偏移) */
+        .animate-fade-in-up { animation: fadeInUp 0.2s ease-out forwards; }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .item-selected {
+            background-color: rgba(0,0,0,0.05);
+            transform: scale(1.05);
+            box-shadow: 0 0 0 2px var(--accent-color);
+        }
+        .dark .item-selected {
+            background-color: rgba(255,255,255,0.1);
+        }
+
+        /* 烟花动画 */
+        .confetti-piece {
+            position: fixed;
+            top: -20px;
+            z-index: 9999;
+            animation: confetti-fall linear forwards;
+            pointer-events: none;
+        }
+        @keyframes confetti-fall {
+            0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+            80% { opacity: 1; }
+            100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
+        }
+        .robot-reward {
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes popIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        /* 提醒弹窗呼吸灯效果 */
+        .pulse-border {
+            animation: pulse-border 2s infinite;
+        }
+        @keyframes pulse-border {
+            0% { box-shadow: 0 0 0 0 rgba(251, 113, 133, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(251, 113, 133, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(251, 113, 133, 0); }
+        }
+    </style>
+
+    <!-- 2. Tailwind 配置 -->
+    <script>
+        window.tailwind = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: { 
+                            50: 'var(--color-50)', 100: 'var(--color-100)', 200: 'var(--color-200)', 
+                            300: 'var(--color-300)', 400: 'var(--color-400)', 500: 'var(--color-500)', 
+                            600: 'var(--color-600)', 700: 'var(--color-700)', 800: 'var(--color-800)', 900: 'var(--color-900)' 
+                        }
+                    }
+                }
+            }
+        };
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+</head>
+<body>
+
+    <div id="app-loading">
+        <div class="spinner"></div>
+        <p style="margin-top: 15px; font-weight: 600; opacity: 0.6;">正在唤醒思熹的助手...</p>
+    </div>
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        setTimeout(() => {
+            const loader = document.getElementById('app-loading');
+            if(loader) {
+                loader.style.opacity = '0';
+                setTimeout(() => loader.style.display = 'none', 500);
+            }
+        }, 600);
+
+        const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+        const getLocalDate = () => {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
+        // --- 高亮组件 ---
+        const HighlightText = ({ text, highlight }) => {
+            if (!highlight || !text) return <>{text}</>;
+            const parts = text.toString().split(new RegExp(`(${highlight})`, 'gi'));
+            return (
+                <span>
+                    {parts.map((part, i) => 
+                        part.toLowerCase() === highlight.toLowerCase() ? 
+                            <span key={i} className="bg-[#fef08a] text-[#854d0e] rounded px-0.5 mx-0.5 transition-colors">{part}</span> : 
+                            part
+                    )}
+                </span>
+            );
+        };
+
+        const THEMES = {
+            pink: {
+                name: "温柔粉",
+                vars: {
+                    '--bg-color': '#fff1f2', '--text-color': '#881337',
+                    '--header-bg': '#fff1f2', '--header-border': '#fecdd3',
+                    '--card-bg': '#ffffff', '--card-border': '#ffe4e6',
+                    '--accent-color': '#fb7185', '--accent-bg': '#ffe4e6',
+                    '--color-50': '#fff1f2', '--color-100': '#ffe4e6', '--color-500': '#fb7185'
+                },
+                dot: '#fb7185',
+                darkColor: '#be123c' // rose-700
+            },
+            green: {
+                name: "治愈绿",
+                vars: {
+                    '--bg-color': '#ecfdf5', '--text-color': '#064e3b',
+                    '--header-bg': '#ecfdf5', '--header-border': '#d1fae5',
+                    '--card-bg': '#ffffff', '--card-border': '#e0f2fe',
+                    '--accent-color': '#10b981', '--accent-bg': '#d1fae5',
+                    '--color-50': '#ecfdf5', '--color-100': '#d1fae5', '--color-500': '#10b981'
+                },
+                dot: '#10b981',
+                darkColor: '#047857' // emerald-700
+            },
+            blue: {
+                name: "静谧蓝",
+                vars: {
+                    '--bg-color': '#f0f9ff', '--text-color': '#0c4a6e',
+                    '--header-bg': '#f0f9ff', '--header-border': '#bae6fd',
+                    '--card-bg': '#ffffff', '--card-border': '#e0f2fe',
+                    '--accent-color': '#38bdf8', '--accent-bg': '#e0f2fe',
+                    '--color-50': '#f0f9ff', '--color-100': '#e0f2fe', '--color-500': '#38bdf8'
+                },
+                dot: '#38bdf8',
+                darkColor: '#0369a1' // sky-700
+            },
+            brown: {
+                name: "大地咖",
+                vars: {
+                    '--bg-color': '#f0e6dd', '--text-color': '#4a3b32',
+                    '--header-bg': '#f0e6dd', '--header-border': '#e3d5ca',
+                    '--card-bg': '#fdfbf9', '--card-border': '#ebe5e0',
+                    '--accent-color': '#a68a76', '--accent-bg': '#e3d5ca',
+                    '--color-50': '#f5eadd', '--color-100': '#e8d8cd', '--color-500': '#9d775f'
+                },
+                dot: '#a68a76',
+                darkColor: '#785b4a'
+            }
+        };
+
+        const Icon = ({ children, size = 20, className = "", style={} }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>{children}</svg>
+        );
+        const Icons = {
+            Search: (p) => <Icon {...p}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></Icon>,
+            Plus: (p) => <Icon {...p}><path d="M5 12h14"/><path d="M12 5v14"/></Icon>,
+            Copy: (p) => <Icon {...p}><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></Icon>,
+            Trash: (p) => <Icon {...p}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></Icon>,
+            Edit: (p) => <Icon {...p}><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></Icon>,
+            Check: (p) => <Icon {...p}><polyline points="20 6 9 17 4 12"/></Icon>,
+            X: (p) => <Icon {...p}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></Icon>,
+            Moon: (p) => <Icon {...p}><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></Icon>,
+            Upload: (p) => <Icon {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></Icon>,
+            Leaf: (p) => <Icon {...p}><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></Icon>,
+            Sparkles: (p) => <Icon {...p}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1-1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M9 3v4"/><path d="M3 9h4"/><path d="M3 5h4"/></Icon>,
+            Eye: (p) => <Icon {...p}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></Icon>,
+            Keyboard: (p) => <Icon {...p}><rect width="20" height="16" x="2" y="4" rx="2" ry="2"/><path d="M6 8h.001"/><path d="M10 8h.001"/><path d="M14 8h.001"/><path d="M18 8h.001"/><path d="M6 12h.001"/><path d="M10 12h.001"/><path d="M14 12h.001"/><path d="M18 12h.001"/></Icon>,
+            Right: (p) => <Icon {...p}><path d="m9 18 6-6-6-6"/></Icon>,
+            FileCode: (p) => <Icon {...p}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="m10 13-2 2 2 2"/><path d="m14 17 2-2-2-2"/></Icon>,
+            MousePointerClick: (p) => <Icon {...p}><path d="m9 9 5 12 1.8-5.2L21 14Z"/><path d="M7.2 2.2 8 5.1"/><path d="m5.1 8-2.9-.8"/><path d="M14 4.1 12 6"/><path d="m6 12-1.9 2"/></Icon>,
+            Table: (p) => <Icon {...p}><path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></Icon>,
+            Code: (p) => <Icon {...p}><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></Icon>,
+            Database: (p) => <Icon {...p}><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></Icon>,
+            Medal: (p) => <Icon {...p}><path d="M7.21 15 2.66 7.14a2 2 0 0 1 .13-2.2L4.4 2.8A2 2 0 0 1 6 2h12a2 2 0 0 1 1.6.8l1.6 2.14a2 2 0 0 1 .14 2.2L16.79 15"/><path d="M11 12 5.12 2.2"/><path d="m13 12 5.88-9.8"/><path d="M8 7h8"/><circle cx="12" cy="17" r="5"/><path d="M12 18v-2h-.5"/></Icon>,
+            Palette: (p) => <Icon {...p}><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></Icon>,
+            Clock: (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></Icon>,
+            Hourglass: (p) => <Icon {...p}><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></Icon>,
+            Stop: (p) => <Icon {...p}><rect x="6" y="6" width="12" height="12" rx="2" /></Icon>,
+            Book: (p) => <Icon {...p}><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></Icon>,
+            Briefcase: (p) => <Icon {...p}><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></Icon>,
+            PenTool: (p) => <Icon {...p}><path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="m2 2 7.586 7.586"/><circle cx="11" cy="11" r="2"/></Icon>,
+            Globe: (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><line x1="2" x2="22" y1="12" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></Icon>,
+            Heart: (p) => <Icon {...p}><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></Icon>,
+            HeartOutline: (p) => <Icon {...p}><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></Icon>,
+            Info: (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></Icon>,
+            Alert: (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></Icon>,
+            Save: (p) => <Icon {...p}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></Icon>,
+            Coffee: (p) => <Icon {...p}><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" x2="6" y1="2" y2="4"/><line x1="10" x2="10" y1="2" y2="4"/><line x1="14" x2="14" y1="2" y2="4"/></Icon>,
+            SortDesc: (p) => <Icon {...p}><path d="M11 5h10"/><path d="M11 9h7"/><path d="M11 13h4"/><path d="M3 17l3 3 3-3"/><path d="M6 18V4"/></Icon>,
+            ArrowUp: (p) => <Icon {...p}><path d="m18 15-6-6-6 6"/></Icon>,
+            ArrowDown: (p) => <Icon {...p}><path d="m6 9 6 6 6-6"/></Icon>,
+            Grip: (p) => <Icon {...p}><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></Icon>,
+            Hash: (p) => <Icon {...p}><line x1="4" x2="20" y1="9" y2="9"/><line x1="4" x2="20" y1="15" y2="15"/><line x1="10" x2="8" y1="3" y2="21"/><line x1="16" x2="14" y1="3" y2="21"/></Icon>,
+            Bug: (p) => <Icon {...p}><rect width="8" height="14" x="8" y="6" rx="4"/><path d="m19 7-3 3"/><path d="m5 7 3 3"/><path d="m19 19-3-3"/><path d="m5 19 3-3"/><path d="M20 13h-4"/><path d="M4 13h4"/><path d="m10 4 1 2"/><path d="m14 4-1 2"/></Icon>,
+            Pin: (p) => <Icon {...p}><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></Icon>,
+            PinOff: (p) => <Icon {...p}><line x1="2" y1="2" x2="22" y2="22"/><line x1="12" y1="17" x2="12" y2="22"/><path d="M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17h14v-1.76a2 2 0 0 0-.25-.92"/><path d="M15 6h1a2 2 0 0 0 0-4H8a2 2 0 0 0-1.78 1.1"/></Icon>,
+            Flame: (p) => <Icon {...p}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.1.2-2.2.5-3.3a9 9 0 0 0 2.5 3.3z"/></Icon>,
+            Tag: (p) => <Icon {...p}><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l5 5a2 2 0 0 0 2.828 0l7.172-7.172a2 2 0 0 0 0-2.828l-5-5z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></Icon>
+        };
+
+        const INITIAL_DATA = [
+            { id: 1, category: 'excel', type: 'code', title: 'VLOOKUP 查找', code: '=VLOOKUP(查找值, 区域, 列号, 0)', note: '数据分析必备，精确查找匹配数据。', explanation: '查找值：要查找的内容\n区域：查找范围\n列号：返回数据所在列\n0：精确匹配', tags: ['Excel', '函数'] },
+            { id: 2, category: 'python', type: 'code', title: 'Pandas 读取CSV', code: 'df = pd.read_csv("data.csv", encoding="utf-8")', note: '读取文件出现乱码时，记得检查 encoding 参数。', tags: ['Python', '数据分析'] },
+            { id: 3, category: 'mysql', type: 'code', title: '基础查询 Select', code: 'SELECT * FROM table_name WHERE condition LIMIT 10;', note: '先看前10行，避免数据量过大卡死。', tags: ['SQL', '查询'] },
+            { id: 4, category: 'excel', type: 'keys', title: '透视表快捷键', code: 'Alt + N + V', note: 'Windows下快速插入数据透视表，超好用！', tags: ['Excel', '快捷键'] },
+            { id: 5, category: 'python', type: 'code', title: '数据透视 Pivot', code: 'df.pivot_table(index="col1", values="col2", aggfunc="sum")', note: 'Python版的数据透视表，aggfunc可是求和、计数等。', tags: ['Python', '数据分析'] }
+        ];
+
+        const DEFAULT_CATEGORIES = [
+            { id: 'excel', label: 'Excel', icon: 'Table' },
+            { id: 'python', label: 'Python', icon: 'Code' }, 
+            { id: 'mysql', label: 'MySQL', icon: 'Database' }
+        ];
+
+        const AVAILABLE_ICONS = ['Table', 'Code', 'Database', 'Book', 'Briefcase', 'PenTool', 'Globe'];
+
+        const types = {
+            'code': { label: '代码', icon: Icons.FileCode, color: '#8b5cf6', bg: '#f5f3ff', darkBg: 'rgba(139, 92, 246, 0.2)' }, 
+            'keys': { label: '快捷', icon: Icons.Keyboard, color: '#f59e0b', bg: '#fffbeb', darkBg: 'rgba(245, 158, 11, 0.2)' },
+            'steps': { label: '步骤', icon: Icons.MousePointerClick, color: '#f43f5e', bg: '#fff1f2', darkBg: 'rgba(244, 63, 94, 0.2)' },
+            'note': { label: '笔记', icon: Icons.Book, color: '#10b981', bg: '#ecfdf5', darkBg: 'rgba(16, 185, 129, 0.2)' }
+        };
+        
+        const typeKeys = Object.keys(types);
+
+        const TIMER_OPTIONS = [5, 10, 25, 45]; 
+
+        // --- 烟花组件 ---
+        const ConfettiSystem = ({ active }) => {
+            if (!active) return null;
+            const pieces = useMemo(() => Array.from({ length: 40 }).map((_, i) => ({
+                id: i,
+                left: Math.random() * 100 + 'vw',
+                delay: Math.random() * 2 + 's',
+                duration: 2 + Math.random() * 3 + 's',
+                emoji: ['🎉', '✨', '🤖', '❤️', '🎈'][Math.floor(Math.random() * 5)]
+            })), []);
+
+            return (
+                <div className="fixed inset-0 pointer-events-none z-[9999]">
+                    {pieces.map(p => (
+                        <div key={p.id} className="confetti-piece text-2xl" style={{left: p.left, animationDelay: p.delay, animationDuration: p.duration}}>
+                            {p.emoji}
+                        </div>
+                    ))}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center robot-reward">
+                        <div className="text-8xl drop-shadow-2xl">🤖</div>
+                        <div className="text-4xl absolute -top-4 -right-4 animate-bounce">❤️</div>
+                        <div className="mt-4 bg-white/90 backdrop-blur px-6 py-2 rounded-full shadow-lg font-bold text-slate-800">专注达成！太棒了！</div>
+                    </div>
+                </div>
+            );
+        };
+
+        const AnalogClock = ({ darkMode, onClick }) => {
+            const [time, setTime] = useState(new Date());
+            useEffect(() => { const t = setInterval(() => setTime(new Date()), 1000); return () => clearInterval(t); }, []);
+            const secDeg = (time.getSeconds()/60)*360;
+            const minDeg = ((time.getMinutes()+time.getSeconds()/60)/60)*360;
+            const hourDeg = ((time.getHours()%12+time.getMinutes()/60)/12)*360;
+            return (
+                <div onClick={onClick} className="flex items-center gap-2 px-3 py-1.5 rounded-full border shadow-sm transition-colors cursor-pointer hover:scale-105 active:scale-95 relative group/clock" 
+                    style={{
+                        backgroundColor: darkMode ? '#1e293b' : 'white', 
+                        borderColor: darkMode ? '#334155' : '#e2e8f0',
+                        minWidth: '124px'
+                    }}>
+                    <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] bg-slate-800 text-white px-2 py-1 rounded opacity-0 group-hover/clock:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none">点击开启 (Alt+F)</div>
+                    
+                    <div className="relative w-8 h-8 rounded-full border flex items-center justify-center shadow-inner"
+                        style={{backgroundColor: darkMode ? '#334155' : '#f1f5f9', borderColor: darkMode ? '#475569' : '#cbd5e1'}}>
+                        <div className="absolute w-[2px] h-[8px] rounded-full origin-bottom bottom-1/2 left-[calc(50%-1px)]" style={{transform:`rotate(${hourDeg}deg)`, backgroundColor: darkMode ? '#e2e8f0' : '#1e293b'}}/>
+                        <div className="absolute w-[1.5px] h-[11px] rounded-full origin-bottom bottom-1/2 left-[calc(50%-0.75px)]" style={{transform:`rotate(${minDeg}deg)`, backgroundColor: darkMode ? '#94a3b8' : '#475569'}}/>
+                        <div className="absolute w-[1px] h-[12px] bg-rose-500 rounded-full origin-bottom bottom-1/2 left-[calc(50%-0.5px)]" style={{transform:`rotate(${secDeg}deg)`}}/>
+                        <div className="absolute w-1 h-1 rounded-full z-10" style={{backgroundColor: darkMode ? '#e2e8f0' : '#1e293b'}}/>
+                    </div>
+                    <div className="flex flex-col leading-none whitespace-nowrap">
+                        <span className="text-xs font-bold font-mono" style={{color: darkMode ? '#fff' : '#1e293b'}}>{time.toLocaleTimeString('en-GB',{hour12:false})}</span>
+                        <span className="text-[9px] font-medium" style={{color: darkMode ? '#94a3b8' : '#64748b'}}>{time.toLocaleDateString('zh-CN',{month:'short',day:'numeric',weekday:'short'})}</span>
+                    </div>
+                </div>
+            );
+        };
+
+        const PomodoroWidget = ({ darkMode, onStart, state, time, onStop }) => {
+            const totalLength = 297;
+            const progress = state === 'running' ? (time / (window.currentTotalTime || 1)) * totalLength : totalLength;
+            return (
+                <div onClick={state === 'idle' ? onStart : undefined} className="relative flex items-center justify-center w-32 h-[46px] rounded-full transition-all cursor-pointer hover:scale-105 active:scale-95 group"
+                    style={{backgroundColor: darkMode ? '#1e293b' : 'white'}}>
+                    <div className="absolute inset-0 rounded-full border pointer-events-none" style={{borderColor: darkMode ? '#334155' : '#e2e8f0'}}></div>
+                    {state === 'idle' ? (
+                        <div className="flex items-center gap-2 text-slate-400 hover-text-accent transition-colors z-10">
+                             <Icons.Clock size={18}/>
+                             <span className="text-xs font-bold font-sans">Tomato Clock</span>
+                        </div>
+                    ) : (
+                        <>
+                            <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 128 46">
+                                <rect x="2" y="2" width="124" height="42" rx="21" fill="none" strokeWidth="3" stroke={darkMode ? '#334155' : '#e2e8f0'} />
+                                <rect x="2" y="2" width="124" height="42" rx="21" fill="none" strokeWidth="3" stroke="var(--accent-color)" strokeDasharray={totalLength} strokeDashoffset={totalLength - progress} strokeLinecap="round" className="timer-circle-path" />
+                            </svg>
+                            <div className="flex items-center gap-1 z-10">
+                                <span className="font-mono font-bold text-lg" style={{color: 'var(--accent-color)'}}>{Math.floor(time / 60).toString().padStart(2, '0')}:{ (time % 60).toString().padStart(2, '0') }</span>
+                                <button onClick={(e) => { e.stopPropagation(); onStop(); }} className="p-1 text-slate-400 hover:text-red-500 rounded-full hover:bg-slate-100/10"><Icons.X size={14}/></button>
+                            </div>
+                        </>
+                    )}
+                </div>
+            );
+        };
+
+        const Modal = ({ isOpen, onClose, children, title, darkMode, maxWidth = 'max-w-md', showCloseBtn = true }) => {
+            useEffect(() => {
+                if (isOpen) {
+                    document.body.classList.add('modal-open');
+                } else {
+                    document.body.classList.remove('modal-open');
+                }
+                return () => document.body.classList.remove('modal-open');
+            }, [isOpen]);
+            
+            const handleBackdropClick = (e) => {
+                 if (window.getSelection().toString().length > 0) return;
+                 if (e.target === e.currentTarget) {
+                     onClose();
+                 }
+            };
+
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm transition-all" onClick={handleBackdropClick}>
+                    <div className={`w-full ${maxWidth} p-6 rounded-2xl shadow-2xl relative z-10 border transition-colors`} 
+                        onClick={e => e.stopPropagation()}
+                        style={{backgroundColor: darkMode ? '#1e293b' : '#ffffff', borderColor: darkMode ? '#334155' : '#f1f5f9'}}>
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-xl font-bold flex items-center gap-2" style={{color: darkMode ? '#fff' : '#1e293b'}}>{title}</h2>
+                            {showCloseBtn && <button onClick={onClose} className="p-2 rounded-full transition-colors" style={{backgroundColor: darkMode ? '#334155' : '#f1f5f9', color: darkMode ? '#94a3b8' : '#64748b'}}><Icons.X size={18}/></button>}
+                        </div>
+                        {children}
+                    </div>
+                </div>
+            );
+        };
+
+        function App() {
+            const [categories, setCategories] = useState(() => {
+                try {
+                    const c = localStorage.getItem('my_categories');
+                    const stored = c ? JSON.parse(c) : DEFAULT_CATEGORIES;
+                    return stored.map(s => ({
+                        ...s, 
+                        icon: typeof s.icon === 'string' ? s.icon : (s.id === 'excel' ? 'Table' : (s.id === 'python' ? 'Code' : (s.id === 'mysql' ? 'Database' : 'Table')))
+                    }));
+                } catch { return DEFAULT_CATEGORIES.map(c => ({...c, icon: c.icon === Icons.Table ? 'Table' : (c.icon === Icons.Code ? 'Code' : 'Database')})); }
+            });
+
+            const getIconComp = (name) => Icons[name] || Icons.Table;
+
+            const [activeCategory, setActiveCategory] = useState(categories[0].id);
+            const [shortcuts, setShortcuts] = useState(() => {
+                try {
+                    const s = localStorage.getItem('my_shortcuts');
+                    return (s && Array.isArray(JSON.parse(s))) ? JSON.parse(s) : INITIAL_DATA;
+                } catch { return INITIAL_DATA; }
+            });
+            const [darkMode, setDarkMode] = useState(localStorage.getItem('dark_mode') === 'true');
+            const [defaultTheme, setDefaultTheme] = useState(localStorage.getItem('default_theme') || 'pink');
+            const [theme, setTheme] = useState(defaultTheme);
+            const [showPalette, setShowPalette] = useState(false);
+            const [paletteIndex, setPaletteIndex] = useState(0); 
+            const [timerSelection, setTimerSelection] = useState(2); 
+            const [studyStats, setStudyStats] = useState(() => { try { return JSON.parse(localStorage.getItem('study_stats')) || {}; } catch { return {}; } });
+            const [isQuizMode, setIsQuizMode] = useState(false);
+            const [toast, setToast] = useState(null);
+            const [modalType, setModalType] = useState(null); 
+            const [editingItem, setEditingItem] = useState(null);
+            const [deleteId, setDeleteId] = useState(null);
+            const [editingCategoryId, setEditingCategoryId] = useState(null);
+            const [newCategoryName, setNewCategoryName] = useState('');
+            const [newCategoryIcon, setNewCategoryIcon] = useState('Table');
+            const dragCategoryItem = useRef(null);
+            const dragCategoryOverItem = useRef(null);
+            const [showIconPicker, setShowIconPicker] = useState(false);
+            const [searchQuery, setSearchQuery] = useState('');
+            const [newEntry, setNewEntry] = useState({ category: activeCategory, type: 'code', title: '', code: '', note: '', explanation: '', isPinned: false, isHard: false, tags: [] });
+            
+            const [showKeyGuide, setShowKeyGuide] = useState(false);
+            const [timerState, setTimerState] = useState('idle');
+            const [timeLeft, setTimeLeft] = useState(0);
+            
+            const [endTime, setEndTime] = useState(null);
+
+            const [deleteConfirmName, setDeleteConfirmName] = useState('');
+            const [categoryToDelete, setCategoryToDelete] = useState(null);
+            const [showConfetti, setShowConfetti] = useState(false);
+            const [reminderCountdown, setReminderCountdown] = useState(60);
+            
+            const lastRemindedHour = useRef(-1);
+
+            const [showSortMenu, setShowSortMenu] = useState(false);
+            const [viewSortMode, setViewSortMode] = useState('custom'); 
+            
+            // 科目专属排序 (Map<CategoryId, Array<Type>>)
+            const [categoryTypeOrders, setCategoryTypeOrders] = useState(() => {
+                try {
+                    return JSON.parse(localStorage.getItem('my_category_type_orders')) || {};
+                } catch { return {}; }
+            });
+            const defaultTypeOrder = ['keys', 'code', 'steps', 'note'];
+            
+            const [activeTypeFilter, setActiveTypeFilter] = useState(null);
+
+            // 5. 新增：标签筛选相关状态
+            const [showTagsPanel, setShowTagsPanel] = useState(false);
+            const [activeTag, setActiveTag] = useState(null);
+
+            const [bugs, setBugs] = useState(() => { try { return JSON.parse(localStorage.getItem('my_bugs')) || []; } catch { return []; } });
+            const [newBug, setNewBug] = useState('');
+            const [editingBugId, setEditingBugId] = useState(null);
+            const [tempBugText, setTempBugText] = useState('');
+            
+            const [importPendingData, setImportPendingData] = useState(null);
+
+            const fileInputRef = useRef(null);
+            const searchInputRef = useRef(null);
+            const dragItemRef = useRef(null);
+            const toastTimeout = useRef(null); 
+            const titleRef = useRef(null);
+            const codeRef = useRef(null);
+            const noteRef = useRef(null);
+            const explanationRef = useRef(null); 
+            const tagsRef = useRef(null); 
+            const typeBtnRefs = useRef([]);
+            const dragTypeItem = useRef(null);
+            const dragTypeOverItem = useRef(null);
+            
+            // 新增引用
+            const pinBtnRef = useRef(null);
+            const hardBtnRef = useRef(null);
+
+            const level = Math.min(Math.floor(shortcuts.length / 5) + 1, 99);
+            const progress = level >= 99 ? 100 : ((shortcuts.length % 5) / 5) * 100;
+            const nextLevelReq = 5 - (shortcuts.length % 5);
+
+            useEffect(() => { localStorage.setItem('my_shortcuts', JSON.stringify(shortcuts)); }, [shortcuts]);
+            useEffect(() => { localStorage.setItem('my_categories', JSON.stringify(categories)); }, [categories]);
+            useEffect(() => { localStorage.setItem('my_category_type_orders', JSON.stringify(categoryTypeOrders)); }, [categoryTypeOrders]);
+            useEffect(() => { document.documentElement.classList.toggle('dark', darkMode); localStorage.setItem('dark_mode', darkMode); }, [darkMode]);
+            useEffect(() => { localStorage.setItem('default_theme', defaultTheme); }, [defaultTheme]);
+            useEffect(() => { localStorage.setItem('study_stats', JSON.stringify(studyStats)); }, [studyStats]);
+            useEffect(() => { localStorage.setItem('my_bugs', JSON.stringify(bugs)); }, [bugs]);
+
+            useEffect(() => {
+                if (showPalette) {
+                    const idx = Object.keys(THEMES).indexOf(theme);
+                    setPaletteIndex(idx >= 0 ? idx : 0);
+                }
+            }, [showPalette, theme]);
+
+            useEffect(() => {
+                const checkHour = () => {
+                    const now = new Date();
+                    const min = now.getMinutes();
+                    const hour = now.getHours();
+                    if (min === 0 && lastRemindedHour.current !== hour) {
+                        setModalType('reminder');
+                        setReminderCountdown(60); 
+                        lastRemindedHour.current = hour;
+                    }
+                };
+                const interval = setInterval(checkHour, 10000);
+                return () => clearInterval(interval);
+            }, []);
+
+            useEffect(() => {
+                let interval;
+                if (modalType === 'reminder') {
+                    interval = setInterval(() => {
+                        setReminderCountdown(prev => {
+                            if (prev <= 1) {
+                                setModalType(null); 
+                                return 0;
+                            }
+                            return prev - 1;
+                        });
+                    }, 1000);
+                }
+                return () => clearInterval(interval);
+            }, [modalType]);
+
+            useEffect(() => {
+                if (timerState === 'running' && endTime) {
+                    const interval = setInterval(() => {
+                        const now = Date.now();
+                        const diff = Math.ceil((endTime - now) / 1000);
+                        if (diff <= 0) {
+                            setTimeLeft(0);
+                            setTimerState('idle');
+                            setEndTime(null);
+                            const today = getLocalDate();
+                            const minutesAdded = window.currentTotalTime / 60;
+                            setStudyStats(prev => ({ ...prev, [today]: (prev[today] || 0) + minutesAdded }));
+                            setShowConfetti(true);
+                            setTimeout(() => setShowConfetti(false), 5000);
+                        } else {
+                            setTimeLeft(diff);
+                        }
+                    }, 200); 
+                    return () => clearInterval(interval);
+                }
+            }, [timerState, endTime]);
+
+            // 5. 新增：提取所有标签
+            const uniqueTags = useMemo(() => {
+                const tags = new Set();
+                shortcuts.forEach(item => {
+                    if (item.tags && Array.isArray(item.tags)) {
+                        item.tags.forEach(t => tags.add(t));
+                    }
+                });
+                return Array.from(tags).sort();
+            }, [shortcuts]);
+
+            // === 自动修复逻辑 (Start) ===
+            useEffect(() => {
+                // 1. 检查是否存在“孤儿笔记” (Orphan Notes)
+                const existingCategoryIds = new Set(categories.map(c => c.id));
+                const orphanNotes = shortcuts.filter(s => !existingCategoryIds.has(s.category));
+
+                if (orphanNotes.length > 0) {
+                    // 发现孤儿笔记！执行自动救援
+                    const recoveredId = 'cat_recovered_' + Date.now();
+                    const recoveredCategory = {
+                        id: recoveredId,
+                        label: '📂 找回的笔记',
+                        icon: 'Briefcase' 
+                    };
+
+                    // 更新分类列表
+                    setCategories(prev => [...prev, recoveredCategory]);
+
+                    // 将孤儿笔记归类到新分类
+                    setShortcuts(prev => prev.map(s => {
+                        if (!existingCategoryIds.has(s.category)) {
+                            return { ...s, category: recoveredId };
+                        }
+                        return s;
+                    }));
+
+                    showToast(`已自动找回 ${orphanNotes.length} 条丢失分类的笔记！`, 'success');
+                }
+
+                // 2. 检查当前 Active Category 是否有效
+                if (!existingCategoryIds.has(activeCategory)) {
+                    if (categories.length > 0) {
+                        setActiveCategory(categories[0].id);
+                    }
+                }
+
+            }, []); // 仅在组件挂载时执行一次
+            // === 自动修复逻辑 (End) ===
+
+            const startTimer = (minutes) => { 
+                window.currentTotalTime = minutes * 60; 
+                const duration = minutes * 60 * 1000;
+                setEndTime(Date.now() + duration); 
+                setTimeLeft(minutes * 60); 
+                setTimerState('running'); 
+                setModalType(null); 
+            };
+            const stopTimer = () => { setTimerState('idle'); setEndTime(null); }; 
+            
+            const handleDragCategorySort = () => { if(dragCategoryItem.current === null || dragCategoryOverItem.current === null) return; const _categories = [...categories]; const draggedItemContent = _categories[dragCategoryItem.current]; _categories.splice(dragCategoryItem.current, 1); _categories.splice(dragCategoryOverItem.current, 0, draggedItemContent); dragCategoryItem.current = null; dragCategoryOverItem.current = null; setCategories(_categories); };
+            const handleAddCategory = () => { if(!newCategoryName.trim()) return showToast('分类名不能为空', 'error'); const id = 'cat_' + Date.now(); setCategories([...categories, { id, label: newCategoryName, icon: newCategoryIcon }]); setNewCategoryName(''); showToast(`已添加类别：${newCategoryName}`); };
+            
+            const startCategoryDelete = (id) => {
+                if (categories.length <= 1) return showToast('至少保留一个类别', 'error');
+                setCategoryToDelete(id);
+                setDeleteConfirmName(''); 
+                setModalType('verifyDeleteCategory'); 
+            };
+
+            const confirmVerification = () => {
+                setModalType('confirmDeleteCategory');
+            };
+
+            const handleFinalDeleteCategory = () => {
+                const id = categoryToDelete;
+                if (!id) return;
+                setCategories(categories.filter(c => c.id !== id)); 
+                setShortcuts(s => s.filter(item => item.category !== id));
+                if (activeCategory === id) setActiveCategory(categories[0].id); 
+                setDeleteConfirmName('');
+                setCategoryToDelete(null);
+                setModalType('addCategory'); 
+                showToast('类别及相关笔记已删除');
+            };
+            
+            const handleEditCategory = (id, newName) => { setCategories(categories.map(c => c.id === id ? { ...c, label: newName } : c)); setEditingCategoryId(null); };
+            
+            const handleSave = (e) => { 
+                e?.preventDefault(); 
+                if(!newEntry.title) return showToast('标题不能为空', 'error'); 
+                const isDuplicate = shortcuts.some(i => i.category === newEntry.category && i.title.trim() === newEntry.title.trim() && i.id !== (editingItem ? editingItem.id : -1)); 
+                if (isDuplicate) return showToast(`该分类下已存在标题为 "${newEntry.title}" 的笔记！`, 'error'); 
+                
+                // 处理标签输入字符串转数组
+                let processedEntry = { ...newEntry };
+                if (typeof processedEntry.tags === 'string') {
+                    processedEntry.tags = processedEntry.tags.split(/[\s,，]+/).filter(t => t.trim());
+                }
+
+                if(editingItem) { 
+                    setShortcuts(s => s.map(i => i.id === editingItem.id ? {...i, ...processedEntry} : i)); 
+                    showToast('已修改'); 
+                } else { 
+                    setShortcuts(s => [{ id: Date.now(), ...processedEntry }, ...s]); 
+                    showToast('已添加'); 
+                } 
+                setModalType(null); 
+            };
+
+            const handleDelete = () => { setShortcuts(s => s.filter(i => i.id !== deleteId)); setDeleteId(null); setModalType(null); showToast('已删除'); };
+            const showToast = useCallback((msg, type='success') => { if (toastTimeout.current) clearTimeout(toastTimeout.current); setToast({ msg, type }); toastTimeout.current = setTimeout(() => setToast(null), 3000); }, []);
+            
+            const openAdd = useCallback(() => { 
+                setEditingItem(null); 
+                // 智能分类：如果当前选中的是特定分类（非全部，非标签筛选），则新建笔记默认为该分类
+                const targetCat = (activeCategory !== 'all' && !activeTag && categories.find(c => c.id === activeCategory)) 
+                                  ? activeCategory 
+                                  : categories[0].id;
+                                  
+                setNewEntry({category: targetCat, type:'code', title:'', code:'', note:'', explanation: '', isPinned: false, isHard: false, tags: []}); 
+                setModalType('add');
+                setTimeout(() => {
+                    if (typeBtnRefs.current[0]) typeBtnRefs.current[0].focus();
+                }, 50);
+            }, [activeCategory, categories, activeTag]);
+            
+            const openEdit = (item) => { 
+                setEditingItem(item); 
+                // 确保 tags 存在
+                setNewEntry({...item, tags: item.tags || []}); 
+                setModalType('add'); 
+                setTimeout(() => {
+                    titleRef.current?.focus();
+                }, 50);
+            }; 
+            const handleDragEnter = (targetId) => { 
+                // 5. 修复：标签筛选模式下也不允许拖拽排序
+                if (viewSortMode !== 'custom' || activeTypeFilter || searchQuery || activeTag) return;
+
+                const dragId = dragItemRef.current; if (dragId === null || dragId === targetId) return; const dragIndex = shortcuts.findIndex(item => item.id === dragId); const targetIndex = shortcuts.findIndex(item => item.id === targetId); if (dragIndex !== -1 && targetIndex !== -1) { const newShortcuts = [...shortcuts]; const temp = newShortcuts[dragIndex]; newShortcuts.splice(dragIndex, 1); newShortcuts.splice(targetIndex, 0, temp); setShortcuts(newShortcuts); if (window.navigator && window.navigator.vibrate) window.navigator.vibrate(5); } };
+            const handleDragStart = (e, id) => { dragItemRef.current = id; setTimeout(() => { const el = document.getElementById(`item-${id}`); if(el) el.classList.add('is-dragging'); }, 0); };
+            const handleDragEnd = (e, id) => { dragItemRef.current = null; const el = document.getElementById(`item-${id}`); if(el) el.classList.remove('is-dragging'); };
+            
+            const handleCopy = (text) => { 
+                // navigator.clipboard.writeText(text); // 原API可能被iframe策略拦截
+                // 使用 execCommand 作为兼容方案
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                
+                // 确保元素不可见但可被选中，防止页面滚动
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                textArea.style.top = "0";
+                
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                
+                try {
+                    const successful = document.execCommand('copy');
+                    if (successful) {
+                        showToast('已复制');
+                    } else {
+                        showToast('复制失败', 'error');
+                    }
+                } catch (err) {
+                    console.error('Fallback: Oops, unable to copy', err);
+                    showToast('复制失败', 'error');
+                }
+                
+                document.body.removeChild(textArea);
+            };
+
+            // 拖拽排序 Types (Per Category)
+            const handleDragTypeSort = () => {
+                if (dragTypeItem.current === null || dragTypeOverItem.current === null) return;
+                
+                const currentOrder = categoryTypeOrders[activeCategory] || defaultTypeOrder;
+                const _typeOrder = [...currentOrder];
+                
+                const draggedItem = _typeOrder[dragTypeItem.current];
+                _typeOrder.splice(dragTypeItem.current, 1);
+                _typeOrder.splice(dragTypeOverItem.current, 0, draggedItem);
+                
+                dragTypeItem.current = null;
+                dragTypeOverItem.current = null;
+                
+                setCategoryTypeOrders(prev => ({
+                    ...prev,
+                    [activeCategory]: _typeOrder
+                }));
+            };
+
+            // 导入 - 应用数据
+            const finalizeImport = (finalShortcuts, categoriesToMerge, rawData) => {
+                if (categoriesToMerge.length > 0) {
+                    setCategories(prev => {
+                        const prevMap = new Map(prev.map(c => [c.id, c]));
+                        categoriesToMerge.forEach(c => prevMap.set(c.id, c));
+                        return Array.from(prevMap.values());
+                    });
+                }
+                
+                setShortcuts(finalShortcuts);
+                
+                if (rawData.studyStats) {
+                    setStudyStats(prev => ({ ...prev, ...rawData.studyStats }));
+                }
+                if (rawData.categoryTypeOrders) {
+                    setCategoryTypeOrders(prev => ({ ...prev, ...rawData.categoryTypeOrders }));
+                }
+                
+                showToast('完整数据恢复成功！');
+                setImportPendingData(null);
+                setModalType(null);
+            };
+
+            const handleImport = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const rawData = JSON.parse(event.target.result);
+                        
+                        let finalShortcuts = [];
+                        let categoriesToMerge = [];
+
+                        if (Array.isArray(rawData)) {
+                            // v1
+                            finalShortcuts = rawData;
+                            showToast('正在导入旧版备份 (分类名可能丢失)', 'info');
+                            const existingCatIds = categories.map(c => c.id);
+                            const importCatIds = [...new Set(finalShortcuts.map(item => item.category))];
+                            const missingIds = importCatIds.filter(id => !existingCatIds.includes(id));
+                            if (missingIds.length > 0) {
+                                const recoveredCats = missingIds.map(id => ({ id: id, label: '恢复的分类', icon: 'Table' }));
+                                categoriesToMerge = recoveredCats;
+                            }
+                        } else if (rawData.version && rawData.categories && rawData.shortcuts) {
+                            // v2
+                            finalShortcuts = rawData.shortcuts;
+                            categoriesToMerge = rawData.categories;
+                        } else {
+                            return showToast('文件格式不识别', 'error');
+                        }
+
+                        // 2. 修复：检测“孤儿”本地笔记 (当前有，但备份里没有的)
+                        const importedIds = new Set(finalShortcuts.map(s => s.id));
+                        const uniqueLocalNotes = shortcuts.filter(s => !importedIds.has(s.id));
+
+                        if (uniqueLocalNotes.length > 0) {
+                            // 发现冲突，请求指示
+                            setImportPendingData({ 
+                                shortcuts: finalShortcuts, 
+                                categories: categoriesToMerge, 
+                                studyStats: rawData.studyStats, 
+                                categoryTypeOrders: rawData.categoryTypeOrders,
+                                localUnique: uniqueLocalNotes
+                            });
+                            setModalType('importConflict');
+                        } else {
+                            // 无冲突，直接覆盖
+                            finalizeImport(finalShortcuts, categoriesToMerge, rawData);
+                        }
+
+                    } catch (error) {
+                        console.error(error);
+                        showToast('导入失败：文件损坏', 'error');
+                    }
+                };
+                reader.readAsText(file);
+                e.target.value = ''; 
+            };
+
+            const handleConfirmImport = (keepLocals) => {
+                if (!importPendingData) return;
+                
+                let mergedShortcuts = [...importPendingData.shortcuts];
+                
+                if (keepLocals) {
+                    // 合并模式：保留本地独有的笔记
+                    mergedShortcuts = [...mergedShortcuts, ...importPendingData.localUnique];
+                }
+                
+                finalizeImport(mergedShortcuts, importPendingData.categories, {
+                    studyStats: importPendingData.studyStats,
+                    categoryTypeOrders: importPendingData.categoryTypeOrders
+                });
+            };
+
+            const handleExport = () => {
+                const now = new Date();
+                const timestamp = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0') + '_' + String(now.getHours()).padStart(2,'0') + '-' + String(now.getMinutes()).padStart(2,'0');
+                const filename = `backup_${timestamp}.json`; 
+                
+                const backupData = {
+                    version: '3.34', 
+                    timestamp: new Date().toISOString(),
+                    categories: categories,
+                    shortcuts: shortcuts,
+                    studyStats: studyStats, // 0. 修复：导出专注时长
+                    categoryTypeOrders: categoryTypeOrders // 2. 修复：导出排序偏好
+                };
+                
+                const blob = new Blob([JSON.stringify(backupData)], {type: 'application/json'});
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = filename;
+                a.click();
+            };
+
+            const handleAddBug = () => {
+                if(!newBug.trim()) return;
+                setBugs([{id: Date.now(), text: newBug, date: getLocalDate()}, ...bugs]);
+                setNewBug('');
+                showToast('Bug 已记录');
+            };
+            
+            const handleClearBugs = () => {
+                setBugs([]);
+                setModalType('bugList');
+                showToast('捉虫记已清空 ✨');
+            };
+
+            const startEditBug = (bug) => {
+                setEditingBugId(bug.id);
+                setTempBugText(bug.text);
+            };
+
+            const saveEditBug = () => {
+                if (!tempBugText.trim()) return;
+                setBugs(bugs.map(b => b.id === editingBugId ? { ...b, text: tempBugText } : b));
+                setEditingBugId(null);
+                setTempBugText('');
+                showToast('Bug 已更新');
+            };
+
+            const handleDeleteBug = (id) => {
+                 setBugs(bugs.filter(b => b.id !== id));
+            };
+
+            const safeCloseAddModal = () => {
+                const isDirty = editingItem 
+                    ? (newEntry.title !== editingItem.title || newEntry.code !== editingItem.code || (newEntry.note||'') !== (editingItem.note||'') || (newEntry.explanation||'') !== (editingItem.explanation||'') || newEntry.isPinned !== editingItem.isPinned || newEntry.isHard !== editingItem.isHard)
+                    : (newEntry.title || newEntry.code || newEntry.note);
+
+                if (isDirty) {
+                     setModalType('confirmDiscard');
+                } else {
+                    setModalType(null);
+                }
+            };
+
+            useEffect(() => {
+                const handler = (e) => {
+                    if (e.key === 'Escape') {
+                        e.preventDefault();
+                        if (modalType) {
+                            if (modalType === 'add') {
+                                const isDirty = editingItem 
+                                    ? (newEntry.title !== editingItem.title || newEntry.code !== editingItem.code || (newEntry.note||'') !== (editingItem.note||'') || (newEntry.explanation||'') !== (editingItem.explanation||'') || newEntry.isPinned !== editingItem.isPinned || newEntry.isHard !== editingItem.isHard)
+                                    : (newEntry.title || newEntry.code || newEntry.note);
+                                
+                                if (isDirty) {
+                                    setModalType('confirmDiscard');
+                                    return;
+                                }
+                            }
+                            setModalType(null);
+                            setDeleteConfirmName(''); 
+                            setCategoryToDelete(null);
+                            setImportPendingData(null);
+                            return;
+                        }
+                        if (searchQuery) {
+                            setSearchQuery('');
+                            searchInputRef.current?.blur();
+                            return;
+                        }
+                        if (showPalette) { setShowPalette(false); return; }
+                        if (showSortMenu) { setShowSortMenu(false); return; }
+                        if (showKeyGuide) { setShowKeyGuide(false); return; }
+                        if (deleteId) { setDeleteId(null); return; }
+                        if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+                            // Don't blur if editing a bug inside modal
+                            if (modalType === 'bugList' && editingBugId) return; 
+                            document.activeElement.blur();
+                            return;
+                        }
+                        return;
+                    }
+
+                    if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+                        return;
+                    }
+
+                    if (modalType === 'timer') {
+                        if (e.key === 'ArrowRight') { e.preventDefault(); setTimerSelection(p => (p + 1) % TIMER_OPTIONS.length); } 
+                        else if (e.key === 'ArrowLeft') { e.preventDefault(); setTimerSelection(p => (p - 1 + TIMER_OPTIONS.length) % TIMER_OPTIONS.length); } 
+                        else if (e.key === 'Enter') { e.preventDefault(); startTimer(TIMER_OPTIONS[timerSelection]); } 
+                        return;
+                    }
+
+                    if (showPalette) {
+                        const themeKeys = Object.keys(THEMES);
+                        if (e.key === 'ArrowDown') { e.preventDefault(); setPaletteIndex(prev => (prev + 1) % themeKeys.length); } 
+                        else if (e.key === 'ArrowUp') { e.preventDefault(); setPaletteIndex(prev => (prev - 1 + themeKeys.length) % themeKeys.length); } 
+                        else if (e.key === 'Enter') { e.preventDefault(); const selectedTheme = themeKeys[paletteIndex]; setTheme(selectedTheme); setShowPalette(false); showToast(`已切换: ${THEMES[selectedTheme].name}`); } 
+                        return;
+                    }
+
+                    if ((e.metaKey || e.ctrlKey) && e.code === 'Space') { e.preventDefault(); if (modalType === null) openAdd(); }
+                    if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); searchInputRef.current?.focus(); }
+                    
+                    if (e.altKey && (e.code === 'KeyF' || e.key === 'F' || e.key === 'f')) { 
+                        e.preventDefault(); 
+                        e.stopPropagation(); 
+                        setModalType('timer'); 
+                    }
+                    if (e.altKey && (e.code === 'KeyD' || e.key === 'D' || e.key === 'd')) { e.preventDefault(); setDarkMode(p => !p); }
+                    if (e.altKey && (e.code === 'KeyS' || e.key === 'S' || e.key === 's')) { e.preventDefault(); setShowPalette(p => !p); }
+                    if (e.altKey && (e.code === 'KeyB' || e.key === 'B' || e.key === 'b')) { e.preventDefault(); setIsQuizMode(p => !p); showToast(isQuizMode?"已退出背诵模式":"进入沉浸背诵模式", isQuizMode?"":"info"); }
+                };
+                document.addEventListener('keydown', handler);
+                return () => document.removeEventListener('keydown', handler);
+            }, [modalType, openAdd, isQuizMode, showPalette, paletteIndex, timerSelection, searchQuery, theme, showSortMenu, newEntry, editingItem, editingBugId]);
+
+            const getHeatmap = () => {
+                const now = new Date();
+                const days = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+                const todayStr = getLocalDate();
+                
+                return Array.from({length: days}, (_, i) => {
+                    const year = now.getFullYear();
+                    const month = String(now.getMonth() + 1).padStart(2, '0');
+                    const day = String(i+1).padStart(2, '0');
+                    const d = `${year}-${month}-${day}`;
+
+                    const mins = studyStats[d] || 0;
+                    const isFuture = d > todayStr;
+                    const isToday = d === todayStr;
+                    
+                    let level = -1; 
+                    if (isToday && mins === 0) level = -2; 
+                    else if (mins > 0) {
+                        if (mins >= 120) level = 4;
+                        else if (mins >= 60) level = 3; 
+                        else if (mins > 0) level = 2; 
+                    }
+
+                    return { date: d, mins, level, isFuture };
+                });
+            };
+
+            const getCssVariables = () => {
+                const t = THEMES[theme].vars;
+                const darkerColor = THEMES[theme].darkColor;
+                let vars = { ...t };
+                
+                vars['--hm-past'] = '#94a3b8'; 
+                vars['--hm-future'] = '#e2e8f0'; 
+                vars['--hm-today'] = t['--accent-bg']; 
+                
+                vars['--hm-lv1'] = t['--accent-color'];
+                vars['--hm-lv2'] = darkerColor;         
+                vars['--hm-max'] = '#000000';            
+
+                if (darkMode) {
+                    vars['--bg-color'] = '#0f172a'; vars['--text-color'] = '#f1f5f9';
+                    vars['--header-bg'] = '#0f172a'; vars['--header-border'] = '#1e293b';
+                    vars['--card-bg'] = '#1e293b'; vars['--card-border'] = '#334155';
+                    vars['--accent-bg'] = 'rgba(255,255,255,0.1)'; vars['--tag-bg-opacity'] = '0.2';
+                    
+                    vars['--hm-past'] = '#475569'; 
+                    vars['--hm-future'] = '#334155'; 
+                    vars['--hm-today'] = 'rgba(255,255,255,0.1)';
+                    vars['--hm-max'] = '#ffffff'; 
+                }
+                return Object.entries(vars).map(([k, v]) => `${k}: ${v};`).join(' ');
+            };
+            
+            const filtered = useMemo(() => {
+                let result = shortcuts;
+                
+                // 5. 新增：标签筛选 (优先级最高，穿透科目)
+                if (activeTag) {
+                    result = result.filter(i => i.tags && i.tags.includes(activeTag));
+                } else {
+                    // 1. Category Filter (仅在无标签筛选时生效)
+                    result = result.filter(i => i.category === activeCategory);
+                }
+
+                // 2. Type Filter
+                if (activeTypeFilter) {
+                    result = result.filter(i => i.type === activeTypeFilter);
+                }
+
+                // 3. Search Filter
+                if (searchQuery) {
+                    const q = searchQuery.toLowerCase();
+                    result = result.filter(i => 
+                        i.title.toLowerCase().includes(q) || 
+                        i.code.toLowerCase().includes(q) || 
+                        (i.note && i.note.toLowerCase().includes(q)) || 
+                        (i.explanation && i.explanation.toLowerCase().includes(q))
+                    );
+                }
+
+                // 4. Sort Logic (2. 修复：置顶区允许拖拽)
+                // 分离置顶和非置顶
+                const pinnedItems = result.filter(i => i.isPinned);
+                const unpinnedItems = result.filter(i => !i.isPinned);
+
+                // 对非置顶项目进行排序
+                unpinnedItems.sort((a, b) => {
+                    // 科目专属排序 (仅在无标签筛选且在分类视图下有效)
+                    if (!activeTag) {
+                        const currentTypeOrder = categoryTypeOrders[activeCategory] || defaultTypeOrder;
+                        const idxA = currentTypeOrder.indexOf(a.type);
+                        const idxB = currentTypeOrder.indexOf(b.type);
+                        if (idxA !== idxB) return idxA - idxB;
+                    }
+
+                    // View Mode
+                    if (viewSortMode === 'newest') {
+                        return b.id - a.id;
+                    } else if (viewSortMode === 'oldest') {
+                        return a.id - b.id;
+                    } else {
+                        return 0; // 默认顺序
+                    }
+                });
+
+                // 置顶项目保持原数组顺序（即拖拽顺序），非置顶项目按规则排序
+                return [...pinnedItems, ...unpinnedItems];
+
+            }, [shortcuts, activeCategory, searchQuery, activeTypeFilter, viewSortMode, categoryTypeOrders, activeTag]);
+
+            const getEncouragement = (dateStr) => {
+                const msgs = [
+                    "等待一颗种子发芽... 🌱",
+                    "今天也是充满希望的一天！✨",
+                    "休息是为了走更远的路 💤",
+                    "积少成多，明天加油！🔥",
+                    "也许在酝酿一个大招？🤔",
+                    "哪怕发会儿呆也是好的 ☁️"
+                ];
+                const index = dateStr.split('').reduce((a,b)=>a+b.charCodeAt(0),0) % msgs.length;
+                return msgs[index];
+            };
+
+            const handleTypeKeyDown = (e, index) => {
+                if(['ArrowUp', 'ArrowDown'].includes(e.key)) e.preventDefault();
+
+                if (e.key === 'ArrowDown') {
+                    const next = (index + 1) % typeKeys.length;
+                    setNewEntry({...newEntry, type: typeKeys[next]});
+                    typeBtnRefs.current[next].focus();
+                } else if (e.key === 'ArrowUp') {
+                    const prev = (index - 1 + typeKeys.length) % typeKeys.length;
+                    setNewEntry({...newEntry, type: typeKeys[prev]});
+                    typeBtnRefs.current[prev].focus();
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    titleRef.current?.focus();
+                }
+            };
+
+            return (
+                <div className="min-h-screen pb-20 font-sans" style={{}} >
+                    <style>{`:root { ${getCssVariables()} }`}</style>
+                    {toast && <div className="toast-container"><div className="toast-content" style={{backgroundColor: toast.type==='error'?'#ef4444':'var(--accent-color)'}}>{toast.msg}</div></div>}
+                    
+                    <ConfettiSystem active={showConfetti} />
+
+                    <div className="app-header">
+                        <div className="container-max">
+                            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
+                                <div className="flex items-center gap-3 w-full md:w-auto">
+                                    <div className="p-2.5 rounded-xl text-white shadow-sm transition-colors duration-500" style={{backgroundColor: 'var(--accent-bg)', color: 'var(--accent-color)'}}><Icons.Leaf size={24}/></div>
+                                    <div>
+                                        <h1 className="font-extrabold text-xl tracking-tight" style={{color: darkMode ? '#fff' : '#1e293b'}}>思熹的软件工具助手</h1>
+                                        <div className="flex items-center gap-4 mt-1">
+                                            <AnalogClock darkMode={darkMode} onClick={() => setModalType('timer')} />
+                                            <PomodoroWidget darkMode={darkMode} state={timerState} time={timeLeft} onStart={() => setModalType('timer')} onStop={stopTimer} />
+                                            
+                                            {/* Heatmap */}
+                                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border group/heatmap relative ml-auto" style={{backgroundColor: darkMode ? '#1e293b' : '#f1f5f9', borderColor: darkMode ? '#334155' : '#e2e8f0'}}>
+                                                <div className="group/lv relative flex items-center gap-1 cursor-help">
+                                                    <Icons.Medal className="text-amber-500" size={16} />
+                                                    <span className="text-xs font-bold" style={{color: darkMode ? '#cbd5e1' : '#475569'}}>Lv.{level}</span>
+                                                    <div className="p-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-400">
+                                                        <Icons.Info size={10}/>
+                                                    </div>
+                                                    
+                                                    {/* Heatmap Tooltip (Level) */}
+                                                    <div className="hidden group-hover/lv:block absolute top-full left-1/2 -translate-x-1/2 mt-2 p-3 rounded-xl shadow-xl w-64 z-50 border animate-fade-in origin-top" style={{backgroundColor: darkMode?'#1e293b':'#fff', borderColor: darkMode?'#334155':'#e2e8f0', color: darkMode?'#fff':'#1e293b'}}>
+                                                        <div className="mb-2 font-bold text-xs flex justify-between items-center">
+                                                            <span>Lv.{level} 进度</span>
+                                                        </div>
+                                                        <div className="w-full h-2 rounded-full mb-3" style={{backgroundColor: darkMode?'#334155':'#f1f5f9'}}>
+                                                            <div className="h-full rounded-full transition-all duration-500" style={{width:`${progress}%`, backgroundColor: 'var(--accent-color)'}}></div>
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <div className="flex items-center gap-2 text-[10px]"><div className="w-3 h-3 rounded-sm" style={{backgroundColor: 'var(--hm-past)'}}></div> <span>过去未记录 (深灰)</span></div>
+                                                            <div className="flex items-center gap-2 text-[10px]"><div className="w-3 h-3 rounded-sm" style={{backgroundColor: 'var(--hm-today)'}}></div> <span>今日待开始 (浅主题)</span></div>
+                                                            <div className="flex items-center gap-2 text-[10px]"><div className="w-3 h-3 rounded-sm" style={{backgroundColor: 'var(--hm-lv1)'}}></div> <span>0-1 小时 (主题色)</span></div>
+                                                            <div className="flex items-center gap-2 text-[10px]"><div className="w-3 h-3 rounded-sm" style={{backgroundColor: 'var(--hm-lv2)'}}></div> <span>1-2 小时 (深主题色)</span></div>
+                                                            <div className="flex items-center gap-2 text-[10px]"><div className="w-3 h-3 rounded-sm" style={{backgroundColor: 'var(--hm-max)'}}></div> <span>&gt;2 小时 (极致黑)</span></div>
+                                                        </div>
+                                                        <p className="mt-2 text-[10px] opacity-60 pt-2 border-t" style={{borderColor: darkMode?'#334155':'#f1f5f9'}}>加油！再记 {nextLevelReq} 条笔记升级！</p>
+                                                    </div>
+                                                </div>
+                                                <div className="h-3 w-[1px] mx-1" style={{backgroundColor: darkMode ? '#475569' : '#cbd5e1'}}></div>
+                                                <div className="flex gap-[2px]">
+                                                    {getHeatmap().map(d => {
+                                                        let bg = '';
+                                                        if (d.isFuture) bg = 'var(--hm-future)';
+                                                        else if (d.level === -1) bg = 'var(--hm-past)';
+                                                        else if (d.level === -2) bg = 'var(--hm-today)';
+                                                        else if (d.level === 2) bg = 'var(--hm-lv1)';
+                                                        else if (d.level === 3) bg = 'var(--hm-lv2)';
+                                                        else if (d.level === 4) bg = 'var(--hm-max)';
+
+                                                        return (
+                                                            <div key={d.date} className="w-2 h-2 rounded-sm transition-colors group/day relative" style={{ backgroundColor: bg }}>
+                                                                {!d.isFuture && <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/day:block bg-black/80 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-50 pointer-events-none shadow-lg">
+                                                                    {d.mins === 0 ? getEncouragement(d.date) : `${d.date}: 专注 ${d.mins} 分钟`}
+                                                                    <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-black/80"></div>
+                                                                </div>}
+                                                                {d.isFuture && <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/day:block bg-black/80 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-50 pointer-events-none shadow-lg">
+                                                                    未来都是充满希望的！
+                                                                    <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-black/80"></div>
+                                                                </div>}
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 relative">
+                                    <button onClick={handleExport} className="btn-icon" title="保存备份"><Icons.Save size={20}/></button>
+                                    <button onClick={()=>setDarkMode(!darkMode)} className="btn-icon" title="切换模式 (Alt+D)"><Icons.Moon size={20}/></button>
+                                    <button onClick={()=>{setIsQuizMode(!isQuizMode); showToast(isQuizMode?"已退出背诵模式":"进入沉浸背诵模式", isQuizMode?"":"info")}} className="btn-icon" style={{backgroundColor: isQuizMode ? 'var(--accent-bg)' : '', color: isQuizMode ? 'var(--accent-color)' : ''}} title="背诵模式 (Alt+B)"><Icons.Eye size={20}/></button>
+                                    
+                                    <div className="relative">
+                                        <button onClick={()=>setShowPalette(!showPalette)} className="btn-icon" style={{backgroundColor: showPalette ? 'var(--accent-bg)' : '', color: showPalette ? 'var(--accent-color)' : ''}} title="调色盘 (Alt+S)"><Icons.Palette size={20}/></button>
+                                        {showPalette && (
+                                            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 p-2 rounded-xl shadow-xl border flex flex-col gap-1 z-50 min-w-[140px] palette-pop animate-fade-in" style={{backgroundColor: darkMode?'#1e293b':'#fff', borderColor: darkMode?'#334155':'#e2e8f0'}}>
+                                                {Object.entries(THEMES).map(([key, t], idx) => (
+                                                    <div key={key} className={`flex items-center gap-1 justify-center rounded-lg p-1 ${idx === paletteIndex ? 'item-selected' : ''}`}>
+                                                        <button onClick={()=>{setTheme(key); setShowPalette(false); showToast(`已切换: ${t.name}`)}} className={`flex-1 flex items-center justify-center px-3 py-2 rounded-lg text-xs font-bold transition-all hover:bg-slate-50 dark:hover:bg-slate-800`} style={{backgroundColor: theme===key ? 'var(--bg-color)' : 'transparent', color: darkMode?'#fff':'#1e293b'}}>
+                                                            <span className="w-3 h-3 rounded-full shadow-sm mr-2" style={{backgroundColor: t.dot}}></span>
+                                                            {t.name}
+                                                        </button>
+                                                        <button 
+                                                            onClick={(e)=>{ e.stopPropagation(); setDefaultTheme(key); showToast(`已设为默认: ${t.name}`); }}
+                                                            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-rose-500"
+                                                            title="设为默认"
+                                                        >
+                                                            {defaultTheme === key ? <Icons.Heart size={14} className="fill-current"/> : <Icons.HeartOutline size={14}/>}
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                                <div className="text-[9px] text-center mt-1 opacity-50">↑↓选择 Enter确认</div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <button onClick={()=>setModalType('import')} className="btn-icon" title="导入备份"><Icons.Upload size={20}/></button>
+
+                                    <div className="group/keys relative" onMouseEnter={() => setShowPalette(false)}>
+                                        <button onClick={()=>setShowKeyGuide(true)} className="btn-icon" title="快捷键指南"><Icons.Keyboard size={20}/></button>
+                                        <div className="hidden group-hover/keys:block absolute top-full left-1/2 -translate-x-1/2 mt-2 p-3 rounded-xl shadow-xl w-48 z-50 border animate-fade-in text-xs" style={{backgroundColor: darkMode?'#1e293b':'#fff', borderColor: darkMode?'#334155':'#e2e8f0', color: darkMode?'#fff':'#1e293b'}}>
+                                            <p className="font-bold mb-2 text-center">快捷键指南 (Alt版)</p>
+                                            <div className="flex justify-between mb-1"><span>番茄钟</span> <span className="font-mono bg-slate-100 dark:bg-slate-700 px-1 rounded">Alt+F</span></div>
+                                            <div className="flex justify-between mb-1"><span>夜间模式</span> <span className="font-mono bg-slate-100 dark:bg-slate-700 px-1 rounded">Alt+D</span></div>
+                                            <div className="flex justify-between mb-1"><span>调色盘</span> <span className="font-mono bg-slate-100 dark:bg-slate-700 px-1 rounded">Alt+S</span></div>
+                                            <div className="flex justify-between mb-1"><span>背诵模式</span> <span className="font-mono bg-slate-100 dark:bg-slate-700 px-1 rounded">Alt+B</span></div>
+                                            <div className="mt-2 text-[10px] text-center opacity-60">*输入时会自动禁用</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="relative w-full md:w-auto flex-shrink-0 flex gap-2 justify-end">
+                                        <div className="relative">
+                                            <button onClick={()=>setModalType('bugList')} className="btn-icon" title="捉虫记"><Icons.Bug size={20}/></button>
+                                            {bugs.length > 0 && <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-800"></span>}
+                                        </div>
+
+                                        <button onClick={()=>openAdd()} className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 w-10 h-10 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform" title="记一笔"><Icons.Plus size={20}/></button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {/* 5. 新增：标签筛选面板 (放在类目之下) */}
+                            {uniqueTags.length > 0 && (
+                                <div className="mb-4 w-full">
+                                    <div className="w-full">
+                                        <button 
+                                            onClick={() => setShowTagsPanel(!showTagsPanel)} 
+                                            className="flex items-center gap-2 text-xs font-bold px-3 py-2 rounded-lg hover:bg-black/5 transition-colors mb-2"
+                                            style={{color: darkMode ? '#94a3b8' : '#64748b'}}
+                                        >
+                                            <span>🏷️ 按标签查看 ({uniqueTags.length})</span>
+                                            <span className={`transition-transform duration-200 ${showTagsPanel ? 'rotate-180' : ''}`}>▼</span>
+                                            {activeTag && <span className="ml-2 px-2 py-0.5 rounded-full bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400">#{activeTag} <span className="ml-1 cursor-pointer hover:text-rose-800" onClick={(e)=>{e.stopPropagation(); setActiveTag(null)}}>✕</span></span>}
+                                        </button>
+                                        
+                                        {showTagsPanel && (
+                                            <div className="p-3 rounded-xl border flex flex-wrap gap-2 w-full animate-fade-in-up max-h-32 overflow-y-auto custom-scrollbar" 
+                                                style={{
+                                                    backgroundColor: 'var(--bg-color)', /* 修改：背景色与页面主题一致 */
+                                                    borderColor: 'var(--accent-color)', /* 修改：边框色使用主题按钮色 */
+                                                    borderWidth: '1px'
+                                                }}>
+                                                <button 
+                                                    onClick={() => setActiveTag(null)}
+                                                    className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${!activeTag ? 'shadow-sm' : 'opacity-60 hover:opacity-100'}`}
+                                                    style={{
+                                                        backgroundColor: !activeTag ? 'var(--accent-color)' : 'transparent',
+                                                        color: !activeTag ? 'white' : (darkMode ? '#94a3b8' : '#64748b'),
+                                                        borderColor: !activeTag ? 'transparent' : (darkMode ? '#334155' : '#e2e8f0')
+                                                    }}
+                                                >
+                                                    全部
+                                                </button>
+                                                {uniqueTags.map(tag => (
+                                                    <button 
+                                                        key={tag}
+                                                        onClick={() => setActiveTag(activeTag === tag ? null : tag)}
+                                                        className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors flex items-center gap-1 ${activeTag === tag ? 'shadow-sm' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                                                        style={{
+                                                            backgroundColor: activeTag === tag ? (darkMode ? '#334155' : '#f1f5f9') : 'transparent',
+                                                            color: activeTag === tag ? 'var(--accent-color)' : (darkMode ? '#94a3b8' : '#64748b'),
+                                                            borderColor: activeTag === tag ? 'var(--accent-color)' : (darkMode ? '#334155' : '#e2e8f0')
+                                                        }}
+                                                    >
+                                                        <span className="opacity-50">#</span> {tag}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="flex flex-col md:flex-row gap-4 items-center pb-3">
+                                <div className="flex-1 w-full scroll-container">
+                                    <div className="flex p-1 rounded-xl" style={{backgroundColor: darkMode ? '#334155' : 'rgba(255,255,255,0.5)'}}>
+                                        {categories.map(cat => {
+                                            const CatIcon = getIconComp(cat.icon);
+                                            // 如果激活了标签筛选，分类按钮变灰，暗示当前展示的是跨科目内容
+                                            const isActive = !activeTag && activeCategory === cat.id;
+                                            return (
+                                                <button key={cat.id} onClick={()=>{ if(activeTag) setActiveTag(null); setActiveCategory(cat.id); }} className={`px-5 py-2 rounded-lg text-sm font-bold transition-all flex gap-2 items-center whitespace-nowrap category-btn ${activeTag ? 'opacity-50 grayscale hover:grayscale-0 hover:opacity-100' : ''}`}
+                                                    style={{
+                                                        backgroundColor: isActive ? (darkMode?'#1e293b':'white') : 'transparent',
+                                                        color: isActive ? 'var(--accent-color)' : (darkMode?'#94a3b8':'#64748b'),
+                                                        boxShadow: isActive ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
+                                                    }}
+                                                >
+                                                    <CatIcon size={16} /> {cat.label}
+                                                </button>
+                                            );
+                                        })}
+                                        <button onClick={()=>setModalType('addCategory')} className="px-3 py-2 rounded-lg text-sm font-bold transition-all flex gap-2 items-center justify-center hover:bg-black/5 category-btn" style={{color: 'var(--accent-color)'}}>
+                                            <Icons.Plus size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="relative w-full md:w-64 flex-shrink-0 flex gap-2">
+                                    <div className="relative">
+                                        <button onClick={()=>setShowSortMenu(!showSortMenu)} className="w-10 h-10 flex items-center justify-center rounded-full shadow-sm border border-slate-200 dark:border-slate-700 transition-colors" 
+                                        style={{
+                                            backgroundColor: showSortMenu ? 'var(--accent-bg)' : (darkMode ? '#1e293b' : '#ffffff'),
+                                            borderColor: darkMode ? '#334155' : '#e2e8f0', 
+                                            color: showSortMenu ? 'var(--accent-color)' : (darkMode ? '#fff' : '#1e293b')
+                                        }} title="排序"><Icons.SortDesc size={18} /></button>
+                                        
+                                        <div className="absolute top-1/2 right-[120%] -translate-y-1/2 px-2 py-1 rounded-full text-[10px] font-bold whitespace-nowrap opacity-60 pointer-events-none" 
+                                            style={{backgroundColor: darkMode ? '#334155' : '#f1f5f9', color: darkMode ? '#94a3b8' : '#64748b'}}>
+                                            {activeTag ? `标签 #${activeTag}` : (categories.find(c=>c.id===activeCategory)?.label || '全部')}: {filtered.length}条
+                                        </div>
+
+                                        {showSortMenu && (
+                                            <div className="absolute top-full left-0 mt-2 p-3 rounded-xl shadow-xl border w-48 z-[100] animate-fade-in-up origin-top-left" style={{backgroundColor: darkMode?'#1e293b':'#fff', borderColor: darkMode?'#334155':'#e2e8f0', color: darkMode?'#fff':'#1e293b'}}>
+                                                <div className="text-xs font-bold mb-2 opacity-60">1. 选择视图模式</div>
+                                                <div className="flex flex-col gap-1 mb-3">
+                                                    <button onClick={()=>{setViewSortMode('custom'); setShowSortMenu(false); showToast('已切换至自定义排序 (可拖拽)')}} className={`text-left px-3 py-2 rounded-lg text-xs font-bold transition-colors flex items-center gap-2 ${viewSortMode==='custom'?'bg-slate-100 dark:bg-slate-700 text-accent':'hover:bg-slate-50 dark:hover:bg-slate-800'}`} style={{color: viewSortMode==='custom'?'var(--accent-color)':''}}>
+                                                        <span>✨</span> 自定义排序 (默认)
+                                                    </button>
+                                                    <button onClick={()=>{setViewSortMode('newest'); setShowSortMenu(false); showToast('已切换至时间视图 (新→旧)')}} className={`text-left px-3 py-2 rounded-lg text-xs font-bold transition-colors flex items-center gap-2 ${viewSortMode==='newest'?'bg-slate-100 dark:bg-slate-700 text-accent':'hover:bg-slate-50 dark:hover:bg-slate-800'}`} style={{color: viewSortMode==='newest'?'var(--accent-color)':''}}>
+                                                        <span>🕒</span> 按时间 (新→旧)
+                                                    </button>
+                                                    <button onClick={()=>{setViewSortMode('oldest'); setShowSortMenu(false); showToast('已切换至时间视图 (旧→新)')}} className={`text-left px-3 py-2 rounded-lg text-xs font-bold transition-colors flex items-center gap-2 ${viewSortMode==='oldest'?'bg-slate-100 dark:bg-slate-700 text-accent':'hover:bg-slate-50 dark:hover:bg-slate-800'}`} style={{color: viewSortMode==='oldest'?'var(--accent-color)':''}}>
+                                                        <span>🕒</span> 按时间 (旧→新)
+                                                    </button>
+                                                </div>
+                                                
+                                                <div className="h-[1px] w-full my-2" style={{backgroundColor: darkMode?'#334155':'#f1f5f9'}}></div>
+                                                <div className="text-xs font-bold mb-2 opacity-60">
+                                                    2. 调整分类顺序
+                                                    {viewSortMode !== 'custom' && <span className="ml-1 text-[10px] text-red-400">(仅自定义模式可拖拽卡片)</span>}
+                                                </div>
+                                                <div className="flex flex-col gap-1">
+                                                    {
+                                                        (categoryTypeOrders[activeCategory] || defaultTypeOrder).map((t, idx) => {
+                                                            const tConfig = types[t];
+                                                            return (
+                                                                <div key={t} draggable onDragStart={() => dragTypeItem.current = idx} onDragEnter={() => dragTypeOverItem.current = idx} onDragEnd={handleDragTypeSort} onDragOver={(e) => e.preventDefault()}
+                                                                    className={`flex items-center justify-between px-2 py-1 rounded bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 cursor-grab active:cursor-grabbing hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors`}
+                                                                >
+                                                                    <div className="flex items-center gap-2 text-xs font-bold" style={{color: tConfig.color}}>
+                                                                        <Icons.Grip size={10} className="opacity-40"/>
+                                                                        <tConfig.icon size={12}/> {tConfig.label}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })
+                                                    }
+                                                </div>
+                                            </div>
+                                        )}
+                                        {showSortMenu && <div className="fixed inset-0 z-40" onClick={() => setShowSortMenu(false)}></div>}
+                                    </div>
+                                    <div className="relative flex-1 flex items-center gap-2">
+                                        <div className="flex gap-1">
+                                            {Object.entries(types).map(([k, t]) => (
+                                                <button 
+                                                    key={k} 
+                                                    onClick={() => setActiveTypeFilter(activeTypeFilter === k ? null : k)} 
+                                                    className={`p-1.5 rounded-lg transition-all filter-btn ${activeTypeFilter === k ? 'active shadow-sm' : 'opacity-40 hover:opacity-80'}`}
+                                                    style={{
+                                                        backgroundColor: activeTypeFilter === k ? (darkMode ? t.darkBg : t.bg) : 'transparent', 
+                                                        color: t.color
+                                                    }}
+                                                    title={`只看${t.label}`}
+                                                >
+                                                    <t.icon size={16}/>
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700"></div>
+                                        <div className="relative flex-1">
+                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"><Icons.Search size={18}/></div>
+                                            <input ref={searchInputRef} value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} placeholder="" className="search-input" style={{backgroundColor: darkMode?'#1e293b':'#fff', color: darkMode?'#fff':'#1e293b'}} />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <main className="container-max">
+                        {filtered.length === 0 ? (
+                            <div className="text-center py-20" style={{color: darkMode?'#64748b':'#94a3b8'}}>
+                                <div className="mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4" style={{backgroundColor: darkMode?'#1e293b':'#f1f5f9'}}><Icons.Sparkles size={32}/></div>
+                                <p>{activeTag ? '该标签下暂时没有笔记' : '这里空空如也 ~'}</p>
+                            </div>
+                        ) : (
+                            <div className="card-grid">
+                                {filtered.map((item, idx) => {
+                                    const tConf = types[item.type] || types.code;
+                                    // 2. 修复：允许置顶笔记被拖拽 (但标签筛选模式下禁用拖拽，因为涉及跨科目)
+                                    const isDraggable = viewSortMode === 'custom' && !activeTypeFilter && !searchQuery && !activeTag;
+                                    
+                                    return (
+                                        <div key={item.id} id={`item-${item.id}`} draggable={isDraggable} onDragStart={(e) => handleDragStart(e, item.id)} onDragEnter={() => handleDragEnter(item.id)} onDragEnd={(e) => handleDragEnd(e, item.id)} onDragOver={(e) => e.preventDefault()} 
+                                            onClick={(e) => { 
+                                                // 防止选中文本时触发弹窗，提升体验
+                                                if(window.getSelection().toString().length === 0) openEdit(item); 
+                                            }}
+                                            className={`card-item group ${isDraggable ? 'cursor-move' : 'disabled-drag'} ${item.isPinned ? 'card-pinned' : ''} ${item.isHard ? 'card-hard' : ''}`}>
+                                            
+                                            {/* 1. 修复：置顶标记，放在左上角，无动画 */}
+                                            {item.isPinned && <div className="absolute -top-2 -left-2 w-8 h-8 rounded-full flex items-center justify-center text-white shadow-md z-20" style={{backgroundColor: 'var(--accent-color)'}}><Icons.Pin size={16} fill="white" /></div>}
+
+                                            {/* 5. 修复：Hard 标记图标 */}
+                                            {item.isHard && <div className="absolute -top-3 -right-3 w-8 h-8 rounded-full flex items-center justify-center text-white shadow-md z-20 animate-bounce" style={{backgroundColor: '#f43f5e'}}><Icons.Flame size={16}/></div>}
+                                            
+                                            <div className="flex justify-between items-start mb-3">
+                                                <div className="flex items-center gap-2 pr-8 pl-0">
+                                                    <h3 className="font-bold text-lg truncate" style={{color: darkMode?'#fff':'#1e293b'}}>
+                                                        <HighlightText text={item.title} highlight={searchQuery} />
+                                                    </h3>
+                                                </div>
+                                                <div className="flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity absolute top-4 right-4 p-1 rounded-lg shadow-sm backdrop-blur-sm z-10" style={{backgroundColor: darkMode?'rgba(30,41,59,0.9)':'rgba(255,255,255,0.9)'}}>
+                                                    {/* 1. 修复：置顶按钮 */}
+                                                    <button onClick={(e)=>{e.stopPropagation();setShortcuts(s=>s.map(i=>i.id===item.id?{...i, isPinned:!i.isPinned}:i)); showToast(item.isPinned?'已取消置顶':'已置顶')}} className={`p-1.5 rounded-lg hover:bg-slate-100 transition-colors ${item.isPinned ? 'text-rose-500' : (darkMode?'text-slate-400':'text-slate-500')}`} title={item.isPinned?'取消置顶':'置顶'}>
+                                                        {item.isPinned ? <Icons.PinOff size={14}/> : <Icons.Pin size={14}/>}
+                                                    </button>
+                                                    <button onClick={(e)=>{e.stopPropagation();openEdit(item)}} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors" style={{color: darkMode?'#94a3b8':'#64748b'}} onMouseEnter={e=>e.currentTarget.style.color = 'var(--accent-color)'} onMouseLeave={e=>e.currentTarget.style.color = darkMode?'#94a3b8':'#64748b'}><Icons.Edit size={14}/></button>
+                                                    <button onClick={(e)=>{e.stopPropagation();setDeleteId(item.id);setModalType('delete')}} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors" style={{color: darkMode?'#94a3b8':'#64748b'}} onMouseEnter={e=>e.currentTarget.style.color = '#ef4444'} onMouseLeave={e=>e.currentTarget.style.color = darkMode?'#94a3b8':'#64748b'}><Icons.Trash size={14}/></button>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* 4. 新增：固定高度的内容区域 - 改为 flex 自适应 */}
+                                            <div className={`card-content-fixed ${isQuizMode ? 'blur-content' : ''}`}>
+                                                {item.type === 'keys' ? (
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {item.code.split(/ \+ /).map((k,i) => {
+                                                            let displayKey = k.trim();
+                                                            const upperKey = displayKey.toUpperCase();
+                                                            if(upperKey === 'UP' || upperKey === 'ARROWUP' || upperKey === '↑') displayKey = '↑';
+                                                            else if(upperKey === 'DOWN' || upperKey === 'ARROWDOWN' || upperKey === '↓') displayKey = '↓';
+                                                            else if(upperKey === 'LEFT' || upperKey === 'ARROWLEFT' || upperKey === '←') displayKey = '←';
+                                                            else if(upperKey === 'RIGHT' || upperKey === 'ARROWRIGHT' || upperKey === '→') displayKey = '→';
+                                                            else if(upperKey === 'PLUS') displayKey = '+'; 
+                                                            
+                                                            return <span key={i} className="px-2.5 py-1 rounded-lg text-xs font-bold border-b-2" style={{backgroundColor: darkMode?'#334155':'#f1f5f9', borderColor: darkMode?'#475569':'#e2e8f0', color: darkMode?'#e2e8f0':'#334155'}}>
+                                                                <HighlightText text={displayKey} highlight={searchQuery} />
+                                                            </span>
+                                                        })}
+                                                    </div>
+                                                ) : item.type === 'steps' ? (
+                                                    <div className="flex flex-wrap items-center gap-1.5 text-xs mb-2" style={{color: darkMode?'#94a3b8':'#64748b'}}>
+                                                        {item.code.split(/[\n>＞]+/).map((s,i,a)=><React.Fragment key={i}><span className="px-2 py-1 rounded border" style={{backgroundColor: darkMode?'#334155':'#f8fafc', borderColor: darkMode?'#475569':'#e2e8f0'}}>
+                                                            <HighlightText text={s.trim()} highlight={searchQuery} />
+                                                        </span>{i<a.length-1 && <Icons.Right size={12}/>}</React.Fragment>)}
+                                                    </div>
+                                                ) : item.type === 'note' ? (
+                                                    // 6. 修复：新增笔记类型展示
+                                                    <div className="text-sm leading-relaxed whitespace-pre-wrap" style={{color: darkMode?'#cbd5e1':'#475569'}}>
+                                                        <HighlightText text={item.code} highlight={searchQuery} />
+                                                    </div>
+                                                ) : (
+                                                    // 4. 修复：代码块支持换行 (whitespace-pre-wrap)
+                                                    <div className="p-3 rounded-xl border relative group/code" style={{backgroundColor: darkMode?'#0f172a':'#f8fafc', borderColor: darkMode?'#334155':'#f1f5f9'}}>
+                                                        <code className="text-sm font-mono break-all whitespace-pre-wrap" style={{color: darkMode?'#60a5fa':'#2563eb'}}>
+                                                            <HighlightText text={item.code} highlight={searchQuery} />
+                                                        </code>
+                                                        <button onClick={(e)=>{e.stopPropagation(); handleCopy(item.code, item.id)}} className="absolute top-2 right-2 text-slate-400 hover:text-emerald-500 opacity-0 group-hover/code:opacity-100 transition-opacity"><Icons.Copy size={14}/></button>
+                                                    </div>
+                                                )}
+                                                
+                                                {/* 4. 修复：独立解释区 */}
+                                                {item.explanation && (
+                                                    <div className="mt-3 pt-3 border-t text-xs leading-relaxed opacity-80" style={{borderColor: darkMode?'#334155':'#e2e8f0', color: darkMode?'#94a3b8':'#64748b'}}>
+                                                        <div className="font-bold mb-1 opacity-60">💡 详解：</div>
+                                                        <div className="whitespace-pre-wrap">
+                                                            <HighlightText text={item.explanation} highlight={searchQuery} />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* 5. 修复：标签展示区 (增加 mt-3 和边框) */}
+                                            {item.tags && item.tags.length > 0 && (
+                                                <div className="flex flex-wrap gap-1 mb-3 mt-3 pt-2 border-t border-dashed max-h-[46px] overflow-y-auto custom-scrollbar" style={{borderColor: darkMode?'#334155':'#ffe4e6'}}>
+                                                    {item.tags.map(tag => (
+                                                        <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-md border opacity-60" style={{borderColor: darkMode?'#334155':'#e2e8f0', color: darkMode?'#94a3b8':'#64748b'}}>
+                                                            #<HighlightText text={tag} highlight={searchQuery} />
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            <div className="flex justify-between items-center pt-3 border-t mt-auto" style={{borderColor: darkMode?'#334155':'#f1f5f9'}}>
+                                                <div className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border`} style={{borderColor: tConf.color, color: tConf.color, backgroundColor: darkMode ? tConf.darkBg : tConf.bg}}><tConf.icon size={12}/> {tConf.label}</div>
+                                                {item.note && <span className="text-xs max-w-[220px] truncate text-right" style={{color: darkMode?'#94a3b8':'#94a3b8'}} title={item.note}>
+                                                    <HighlightText text={item.note} highlight={searchQuery} />
+                                                </span>}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )}
+                    </main>
+
+                    {/* Timer Modal */}
+                    <Modal isOpen={modalType === 'timer'} onClose={() => setModalType(null)} title="🍅 番茄专注" darkMode={darkMode}>
+                        <div className="text-center py-4">
+                            <p className="mb-6 opacity-60" style={{color: darkMode ? '#fff' : '#1e293b'}}>选择一个专注时长，开始学习吧！</p>
+                            <div className="flex justify-center p-1 rounded-full bg-slate-100 dark:bg-slate-800 mx-auto w-fit">
+                                {TIMER_OPTIONS.map((m, idx) => (
+                                    <button key={m} onClick={() => startTimer(m)} className={`px-6 py-2 rounded-full font-bold text-sm transition-all duration-300 relative z-10 ${idx === timerSelection ? 'shadow-md scale-105' : 'hover:opacity-80'}`}
+                                        style={{
+                                            backgroundColor: idx === timerSelection ? (darkMode ? '#334155' : 'white') : 'transparent',
+                                            color: idx === timerSelection ? 'var(--accent-color)' : (darkMode ? '#94a3b8' : '#64748b')
+                                        }}>
+                                        {m} min
+                                    </button>
+                                ))}
+                            </div>
+                             <div className="text-[10px] text-center mt-6 opacity-50">← →选择 Enter开始</div>
+                        </div>
+                    </Modal>
+
+                    {/* Manage Categories Modal */}
+                    <Modal isOpen={modalType === 'addCategory'} onClose={() => {setModalType(null); setDeleteConfirmName('');}} title="管理类别" darkMode={darkMode}>
+                        <div className="space-y-4">
+                            <div className="space-y-2 mb-4 max-h-60 overflow-y-auto pr-1">
+                                {categories.map((c, idx) => {
+                                    return (
+                                        <div key={c.id} draggable onDragStart={() => dragCategoryItem.current = idx} onDragEnter={() => dragCategoryOverItem.current = idx} onDragEnd={handleDragCategorySort} onDragOver={(e) => e.preventDefault()}
+                                            onClick={(e) => e.stopPropagation()} 
+                                            className="flex flex-col p-2 rounded-lg border cursor-move group transition-all" style={{borderColor: (darkMode?'#334155':'#f1f5f9'), backgroundColor: 'transparent'}}>
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3 flex-1">
+                                                    <div className="relative">
+                                                        <button type="button" onClick={() => setShowIconPicker(showIconPicker === c.id ? null : c.id)} className="p-1 rounded hover:bg-black/5">
+                                                            {(() => { const I = getIconComp(c.icon); return <I size={16} className="text-slate-400"/>; })()}
+                                                        </button>
+                                                        {showIconPicker === c.id && (
+                                                            <div className="absolute left-0 top-full mt-1 bg-white border shadow-xl rounded-lg p-2 z-50 flex gap-1 flex-wrap w-32" style={{backgroundColor: darkMode ? '#1e293b' : 'white'}}>
+                                                                {AVAILABLE_ICONS.map(iName => {
+                                                                    const I = Icons[iName];
+                                                                    return <button type="button" key={iName} onClick={() => { setCategories(categories.map(cat => cat.id === c.id ? {...cat, icon: iName} : cat)); setShowIconPicker(null); }} className="p-1 hover:bg-slate-100 rounded text-slate-500"><I size={14}/></button>
+                                                                })}
+                                                            </div>
+                                                        )}
+                                                        {showIconPicker === c.id && <div className="fixed inset-0 z-40" onClick={() => setShowIconPicker(null)}></div>}
+                                                    </div>
+                                                    {editingCategoryId === c.id ? (
+                                                        <input autoFocus defaultValue={c.label} onBlur={(e)=>handleEditCategory(c.id, e.target.value)} onKeyDown={(e)=>e.key==='Enter'&&handleEditCategory(c.id, e.currentTarget.value)} className="bg-transparent outline-none w-full" style={{color: darkMode?'#fff':'#333'}} />
+                                                    ) : (
+                                                        <span style={{color: darkMode?'#cbd5e1':'#475569'}}>{c.label}</span>
+                                                    )}
+                                                </div>
+                                                <div className="flex gap-2 opacity-50 group-hover:opacity-100">
+                                                    <button onClick={()=>setEditingCategoryId(c.id)} className="text-blue-400 hover:text-blue-500"><Icons.Edit size={14}/></button>
+                                                    <button 
+                                                        onClick={() => startCategoryDelete(c.id)} 
+                                                        className={`transition-colors text-rose-300 hover:text-rose-500`}
+                                                    >
+                                                        <Icons.Trash size={14}/>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                            <form onSubmit={(e) => { e.preventDefault(); handleAddCategory(); }} className="pt-4 border-t" style={{borderColor: darkMode?'#334155':'#f1f5f9'}}>
+                                <div className="flex gap-2 mb-3">
+                                    <div className="relative">
+                                         <button type="button" onClick={() => setShowIconPicker('new')} className="w-10 h-10 border rounded-lg flex items-center justify-center cursor-pointer" style={{borderColor: darkMode?'#334155':'#e2e8f0'}}>
+                                              {(() => { const I = getIconComp(newCategoryIcon); return <I size={18} style={{color: 'var(--accent-color)'}}/> })()}
+                                         </button>
+                                         {showIconPicker === 'new' && (
+                                              <div className="absolute left-0 bottom-full mb-1 bg-white border shadow-xl rounded-lg p-2 z-50 flex gap-1 flex-wrap w-32" style={{backgroundColor: darkMode ? '#1e293b' : 'white'}}>
+                                                  {AVAILABLE_ICONS.map(iName => {
+                                                      const I = Icons[iName];
+                                                      return <button type="button" key={iName} onClick={() => { setNewCategoryIcon(iName); setShowIconPicker(null); }} className="p-1 hover:bg-slate-100 rounded text-slate-500"><I size={14}/></button>
+                                                  })}
+                                              </div>
+                                         )}
+                                         {showIconPicker === 'new' && <div className="fixed inset-0 z-40" onClick={() => setShowIconPicker(null)}></div>}
+                                    </div>
+                                    <input autoFocus value={newCategoryName} onChange={e=>setNewCategoryName(e.target.value)} placeholder="输入新类别名称" className="flex-1 border-none rounded-xl px-4 text-sm font-bold focus:ring-2" style={{backgroundColor: darkMode ? '#0f172a' : '#f8fafc', color: darkMode ? '#f1f5f9' : '#334155'}} />
+                                </div>
+                                <button type="submit" className="w-full py-3 rounded-xl font-bold shadow-lg hover:scale-[1.02] transition-transform" style={{backgroundColor: darkMode ? 'var(--accent-color)' : '#0f172a', color: '#ffffff'}}>添加</button>
+                            </form>
+                        </div>
+                    </Modal>
+                    
+                    {/* Delete Category Verification Steps */}
+                    <Modal isOpen={modalType === 'verifyDeleteCategory'} onClose={() => setModalType('addCategory')} title="🛡️ 安全验证" darkMode={darkMode} maxWidth="max-w-sm">
+                        <div className="space-y-4">
+                            {(() => {
+                                const cat = categories.find(c => c.id === categoryToDelete);
+                                if (!cat) return null;
+                                return (
+                                    <>
+                                        <p className="text-sm opacity-80" style={{color: darkMode ? '#94a3b8' : '#64748b'}}>
+                                            为了防止误删，请输入 <span className="font-bold select-all" style={{color: darkMode?'#fff':'#333'}}>"{cat.label}确认删除"</span>
+                                        </p>
+                                        <input 
+                                            autoFocus
+                                            placeholder={`请输入...`}
+                                            value={deleteConfirmName}
+                                            onChange={(e) => setDeleteConfirmName(e.target.value)}
+                                            className="w-full px-4 py-3 rounded-xl border outline-none text-sm font-bold shadow-sm"
+                                            style={{
+                                                backgroundColor: darkMode?'rgba(0,0,0,0.2)':'rgba(255,255,255,0.5)', 
+                                                borderColor: deleteConfirmName === cat.label + '确认删除' ? 'var(--accent-color)' : (darkMode?'#334155':'#e2e8f0'), 
+                                                color: darkMode?'#fff':'#333'
+                                            }}
+                                        />
+                                        <div className="flex gap-3 pt-2">
+                                            <button onClick={() => setModalType('addCategory')} className="flex-1 py-3 rounded-xl font-bold transition-colors" style={{backgroundColor: darkMode ? '#334155' : '#f1f5f9', color: darkMode ? '#fff' : '#475569'}}>取消</button>
+                                            <button 
+                                                onClick={confirmVerification}
+                                                disabled={deleteConfirmName !== cat.label + '确认删除'}
+                                                className={`flex-1 py-3 rounded-xl font-bold shadow-lg transition-all ${deleteConfirmName === cat.label + '确认删除' ? 'bg-rose-500 hover:bg-rose-600 text-white transform hover:scale-105' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+                                            >
+                                                验证并继续
+                                            </button>
+                                        </div>
+                                    </>
+                                );
+                            })()}
+                        </div>
+                    </Modal>
+
+                    <Modal isOpen={modalType === 'confirmDeleteCategory'} onClose={() => setModalType('addCategory')} title="🚨 最终确认" darkMode={darkMode} maxWidth="max-w-sm">
+                        <div className="text-center">
+                            <div className="w-16 h-16 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                                <Icons.Trash size={32} />
+                            </div>
+                            <h3 className="font-bold text-lg mb-2" style={{color: darkMode ? '#fff' : '#1e293b'}}>真的要删除吗？</h3>
+                            <p className="mb-6 text-sm" style={{color: darkMode ? '#94a3b8' : '#64748b'}}>该类别下的所有笔记也将被<br/><b>永久移除</b>且无法恢复。</p>
+                            <div className="flex gap-3">
+                                <button onClick={() => setModalType('addCategory')} className="flex-1 py-3 rounded-xl font-bold" style={{backgroundColor: darkMode ? '#334155' : '#f1f5f9', color: darkMode ? '#fff' : '#475569'}}>取消</button>
+                                <button onClick={handleFinalDeleteCategory} className="flex-1 py-3 bg-rose-500 text-white rounded-xl font-bold shadow-lg hover:bg-rose-600">确认删除</button>
+                            </div>
+                        </div>
+                    </Modal>
+
+                    {/* Import Conflict Modal (New Feature) */}
+                    <Modal isOpen={modalType === 'importConflict'} onClose={() => setModalType(null)} title="⚠️ 发现新增笔记" darkMode={darkMode} maxWidth="max-w-sm">
+                        <div className="text-center">
+                            <div className="w-16 h-16 bg-amber-100 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                                <Icons.Alert size={32} />
+                            </div>
+                            <h3 className="font-bold text-lg mb-2" style={{color: darkMode ? '#fff' : '#1e293b'}}>是否保留当前新增的笔记？</h3>
+                            <p className="mb-6 text-sm" style={{color: darkMode ? '#94a3b8' : '#64748b'}}>
+                                检测到有 <b>{importPendingData?.localUnique?.length || 0}</b> 条笔记存在于当前设备，<br/>
+                                但不在备份文件中。
+                            </p>
+                            <div className="flex flex-col gap-3">
+                                <button onClick={() => handleConfirmImport(true)} className="w-full py-3 rounded-xl font-bold text-white shadow-lg transition-transform hover:scale-[1.02]" style={{backgroundColor: 'var(--accent-color)'}}>
+                                    ✨ 保留 (合并数据)
+                                </button>
+                                <button onClick={() => handleConfirmImport(false)} className="w-full py-3 rounded-xl font-bold border hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" style={{borderColor: darkMode?'#334155':'#e2e8f0', color: darkMode?'#94a3b8':'#64748b'}}>
+                                    仅恢复备份 (覆盖)
+                                </button>
+                            </div>
+                        </div>
+                    </Modal>
+
+                    {/* Add/Edit Modal */}
+                    <Modal isOpen={modalType === 'add'} onClose={safeCloseAddModal} title={editingItem ? '✏️ 修改笔记' : '✨ 新增笔记'} darkMode={darkMode} maxWidth="max-w-lg">
+                        <form className="space-y-4" onKeyDown={(e) => { 
+                            if((e.ctrlKey || e.metaKey) && e.key === 's') {
+                                handleSave(e); 
+                            }
+                        }}>
+                             {/* 3. 修复：UI 对齐与高度统一 */}
+                             <div className="grid grid-cols-2 gap-4 mb-4"> {/* Increased gap and explicit margin bottom */}
+                                <div className="flex flex-col">
+                                    <label className="text-xs font-bold mb-2 block uppercase" style={{color: darkMode ? '#94a3b8' : '#cbd5e1'}}>类别</label>
+                                    <div className="flex flex-col gap-2 max-h-[170px] overflow-y-auto custom-scrollbar pr-1">
+                                        {categories.map(c => (
+                                            <div key={c.id} onClick={() => setNewEntry({...newEntry, category: c.id})} className={`px-3 py-2 rounded-lg text-xs font-bold border cursor-pointer flex justify-between transition-colors`} style={{borderColor: newEntry.category === c.id ? 'var(--accent-color)' : (darkMode ? '#334155' : '#e2e8f0'), backgroundColor: newEntry.category === c.id ? 'var(--bg-color)' : 'transparent', color: newEntry.category === c.id ? 'var(--accent-color)' : (darkMode ? '#94a3b8' : '#64748b')}}>{c.label} {newEntry.category===c.id&&<Icons.Check size={14}/>}</div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="flex flex-col">
+                                    <label className="text-xs font-bold mb-2 block uppercase" style={{color: darkMode ? '#94a3b8' : '#cbd5e1'}}>类型 (↑ ↓)</label>
+                                    <div className="flex flex-col gap-2"> {/* No max height for types as there are few */}
+                                        {Object.entries(types).map(([k, t], idx) => (
+                                            <button 
+                                                type="button"
+                                                key={k} 
+                                                ref={el => typeBtnRefs.current[idx] = el}
+                                                onClick={() => setNewEntry({...newEntry, type: k})} 
+                                                onKeyDown={(e) => handleTypeKeyDown(e, idx)}
+                                                className={`px-3 py-2 rounded-lg text-xs font-bold border cursor-pointer flex items-center gap-2 transition-colors w-full text-left focus:ring-2 focus:ring-offset-1 focus:outline-none`} 
+                                                style={{
+                                                    borderColor: newEntry.type === k ? t.color : (darkMode ? '#334155' : '#e2e8f0'), 
+                                                    backgroundColor: newEntry.type === k ? (darkMode ? t.darkBg : t.bg) : 'transparent', 
+                                                    color: newEntry.type === k ? t.color : (darkMode ? '#94a3b8' : '#64748b')
+                                                }}
+                                            >
+                                                <t.icon size={14}/> {t.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                             </div>
+                             
+                             <div className="flex gap-4 items-center">
+                                 <input ref={titleRef} value={newEntry.title} onChange={e=>setNewEntry({...newEntry, title:e.target.value})} placeholder="标题" className="flex-1 border-none rounded-xl px-4 py-3 text-sm font-bold focus:ring-2" style={{backgroundColor: darkMode ? '#0f172a' : '#f8fafc', color: darkMode ? '#f1f5f9' : '#334155'}} 
+                                    onKeyDown={(e) => { 
+                                        if(e.key === 'ArrowUp') { 
+                                            e.preventDefault(); 
+                                            const currentTypeIdx = Object.keys(types).indexOf(newEntry.type);
+                                            if (typeBtnRefs.current[currentTypeIdx]) typeBtnRefs.current[currentTypeIdx].focus();
+                                        } 
+                                        if(e.key === 'ArrowDown' || e.key === 'Enter') { e.preventDefault(); codeRef.current?.focus(); }
+                                        // 1. 修复：当光标在末尾时，按右键跳转到"难点"
+                                        if(e.key === 'ArrowRight' && e.target.selectionStart === e.target.value.length) { 
+                                            e.preventDefault(); 
+                                            hardBtnRef.current?.focus(); 
+                                        } 
+                                   }} />
+                                 {/* 5. 修复：Hard 标记开关 改名为 难点 */}
+                                 <button type="button" ref={hardBtnRef} onClick={() => setNewEntry(p => ({...p, isHard: !p.isHard}))} 
+                                    onKeyDown={(e) => {
+                                        if(e.key === 'Enter') { 
+                                            e.preventDefault(); // 阻止默认点击，防止触发两次
+                                            setNewEntry(p => ({...p, isHard: !p.isHard})); // 只切换状态，不跳转
+                                        }
+                                        if(e.key === 'ArrowDown') { // 下箭头 -> 核心内容
+                                            e.preventDefault();
+                                            codeRef.current?.focus();
+                                        }
+                                        if(e.key === 'ArrowLeft') { e.preventDefault(); titleRef.current?.focus(); } // Hard -> Title
+                                        if(e.key === 'ArrowRight') { e.preventDefault(); pinBtnRef.current?.focus(); } // Hard -> Pin
+                                    }}
+                                    className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border outline-none focus:ring-2 ${newEntry.isHard ? 'bg-rose-50 border-rose-500 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' : 'border-transparent text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
+                                      🔥 难点
+                                 </button>
+                                 {/* 1. 修复：置顶开关 */}
+                                 <button type="button" ref={pinBtnRef} onClick={() => setNewEntry(p => ({...p, isPinned: !p.isPinned}))} 
+                                    onKeyDown={(e) => {
+                                        if(e.key === 'Enter') { 
+                                            e.preventDefault(); 
+                                            setNewEntry(p => ({...p, isPinned: !p.isPinned})); 
+                                        }
+                                        // Pin -> Hard (Left)
+                                        if(e.key === 'ArrowLeft') { e.preventDefault(); hardBtnRef.current?.focus(); }
+                                        // Pin -> Core (Down)
+                                        if(e.key === 'ArrowDown') { e.preventDefault(); codeRef.current?.focus(); } 
+                                    }}
+                                    className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border outline-none focus:ring-2 ${newEntry.isPinned ? 'bg-indigo-50 border-indigo-500 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' : 'border-transparent text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
+                                      📌 置顶
+                                 </button>
+                             </div>
+                             
+                             {/* 内容输入框 */}
+                             <div className="relative">
+                                <label className="text-xs font-bold mb-1 block opacity-60" style={{color: darkMode ? '#94a3b8' : '#cbd5e1'}}>
+                                    {newEntry.type === 'note' ? '📝 笔记内容' : (newEntry.type === 'code' ? '💻 代码输入' : '⌨️ 输入区域')}
+                                </label>
+                                <textarea ref={codeRef} rows="3" value={newEntry.code} onChange={e=>setNewEntry({...newEntry, code:e.target.value})} placeholder={newEntry.type==='steps' ? '按Enter自动插入箭头 > ' : (newEntry.type==='keys'?'按键组合...':'输入内容...')} 
+                                    className="w-full border-none rounded-xl px-4 py-3 text-sm font-mono focus:ring-2" style={{backgroundColor: darkMode ? '#0f172a' : '#f8fafc', color: darkMode ? '#f1f5f9' : '#334155'}} 
+                                    onKeyDown={(e) => { 
+                                        if ((e.ctrlKey || e.metaKey) && e.key === 's') return;
+
+                                        if(newEntry.type === 'keys') { 
+                                            const isModifierHeld = e.ctrlKey || e.shiftKey || e.altKey || e.metaKey;
+                                            const isNavKey = ['ArrowUp', 'ArrowDown', 'Enter', 'Tab'].includes(e.key);
+
+                                            if (!isModifierHeld && isNavKey) {
+                                                if (e.key === 'ArrowUp') { e.preventDefault(); titleRef.current?.focus(); }
+                                                if (e.key === 'ArrowDown' || e.key === 'Enter') { e.preventDefault(); noteRef.current?.focus(); }
+                                                return;
+                                            }
+
+                                            e.preventDefault(); 
+                                            const k=[]; 
+                                            if(e.ctrlKey)k.push('Ctrl');
+                                            if(e.shiftKey)k.push('Shift');
+                                            if(e.altKey)k.push('Alt'); 
+                                            if(e.metaKey)k.push('Cmd');
+                                            
+                                            if(!['Control','Shift','Alt','Meta'].includes(e.key)) {
+                                                let keyName = e.key.toUpperCase();
+                                                if (e.key === 'ArrowUp') keyName = '↑';
+                                                else if (e.key === 'ArrowDown') keyName = '↓';
+                                                else if (e.key === 'ArrowLeft') keyName = '←';
+                                                else if (e.key === 'ArrowRight') keyName = '→';
+                                                else if (e.key === '+') keyName = 'Plus'; 
+                                                
+                                                k.push(keyName);
+                                            }
+                                            
+                                            if(k.length) setNewEntry({...newEntry, code: k.join(' + ')}); 
+                                            
+                                    } else if (newEntry.type === 'steps') {
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                                const val = newEntry.code;
+                                                const hasTrailingArrow = val.trim().endsWith('>');
+                                                
+                                                if (hasTrailingArrow) {
+                                                     let newVal = val.trim();
+                                                     if (newVal.endsWith('>')) newVal = newVal.slice(0, -1).trim();
+                                                     setNewEntry({...newEntry, code: newVal});
+                                                     noteRef.current?.focus();
+                                                } else {
+                                                    const start = e.target.selectionStart;
+                                                    const end = e.target.selectionEnd;
+                                                    const newVal = val.substring(0, start) + " > " + val.substring(end);
+                                                    setNewEntry({...newEntry, code: newVal});
+                                                    setTimeout(() => {
+                                                        e.target.selectionStart = e.target.selectionEnd = start + 3;
+                                                    }, 0);
+                                                }
+                                            }
+                                            else if(e.key === 'ArrowUp') { e.preventDefault(); titleRef.current?.focus(); } 
+                                            else if(e.key === 'ArrowDown') { e.preventDefault(); noteRef.current?.focus(); }
+                                    } else { 
+                                            // 4. 修复：允许普通代码块换行，不拦截 Enter
+                                            if(e.key === 'ArrowUp') { e.preventDefault(); titleRef.current?.focus(); } 
+                                            // 修复：当光标在最后一行时，允许向下跳转
+                                            if(e.key === 'ArrowDown' && !e.shiftKey) {
+                                                // 获取当前光标位置是否在最后
+                                                if (e.target.selectionStart === e.target.value.length) {
+                                                    e.preventDefault();
+                                                    noteRef.current?.focus();
+                                                }
+                                            }
+                                    } 
+                                   }} 
+                                />
+                             </div>
+
+                             {/* 备注输入框 */}
+                             <input ref={noteRef} value={newEntry.note} onChange={e=>setNewEntry({...newEntry, note:e.target.value})} placeholder="备注（简短说明）" className="w-full border-none rounded-xl px-4 py-2 text-xs focus:ring-2" style={{backgroundColor: darkMode ? '#0f172a' : '#f8fafc', color: darkMode ? '#f1f5f9' : '#334155'}} 
+                                onKeyDown={(e) => { 
+                                    if(e.key === 'ArrowUp') { e.preventDefault(); codeRef.current?.focus(); } 
+                                    if(e.key === 'ArrowDown') { e.preventDefault(); explanationRef.current?.focus(); } // Fix 3: ArrowDown to explanation
+                                    if(e.key === 'Enter') { handleSave(e); }
+                                }} />
+
+                             {/* 4. 修复：详细解释输入框 */}
+                             <div>
+                                 <label className="text-xs font-bold mb-1 block opacity-60" style={{color: darkMode ? '#94a3b8' : '#cbd5e1'}}>💡 详细解释 (支持中文注释/原理分析)</label>
+                                 <textarea ref={explanationRef} rows="3" value={newEntry.explanation} onChange={e=>setNewEntry({...newEntry, explanation:e.target.value})} placeholder="这里空间很大，可以写下详细的原理、易错点或中文注释..." 
+                                    className="w-full border-none rounded-xl px-4 py-3 text-sm focus:ring-2" style={{backgroundColor: darkMode ? '#0f172a' : '#f8fafc', color: darkMode ? '#f1f5f9' : '#334155'}} 
+                                    onKeyDown={(e) => { // Fix 3: Keyboard nav for explanation
+                                        if(e.key === 'ArrowUp') { e.preventDefault(); noteRef.current?.focus(); }
+                                        if(e.key === 'ArrowDown') { e.preventDefault(); tagsRef.current?.focus(); }
+                                    }}
+                                 />
+                             </div>
+
+                             {/* 5. 新增：标签输入 */}
+                             <div>
+                                 <label className="text-xs font-bold mb-1 block opacity-60" style={{color: darkMode ? '#94a3b8' : '#cbd5e1'}}>🏷️ 标签 (空格或逗号分隔)</label>
+                                 <input ref={tagsRef} value={newEntry.tags} onChange={e=>setNewEntry({...newEntry, tags:e.target.value})} placeholder="例如: 面试 基础 易错" className="w-full border-none rounded-xl px-4 py-2 text-xs focus:ring-2" style={{backgroundColor: darkMode ? '#0f172a' : '#f8fafc', color: darkMode ? '#f1f5f9' : '#334155'}} 
+                                    onKeyDown={(e) => { // Fix 3: Keyboard nav for tags
+                                        if(e.key === 'ArrowUp') { e.preventDefault(); explanationRef.current?.focus(); }
+                                        if(e.key === 'Enter') { handleSave(e); }
+                                    }}
+                                 />
+                             </div>
+                             
+                             <button onClick={handleSave} className="w-full py-3 rounded-xl font-bold shadow-lg hover:scale-[1.02] transition-transform" style={{backgroundColor: darkMode ? 'var(--accent-color)' : '#0f172a', color: '#ffffff'}}>保存 (Ctrl+S)</button>
+                        </form>
+                    </Modal>
+
+                    {/* Confirm Discard Modal (Bug Fix 4) */}
+                    <Modal isOpen={modalType === 'confirmDiscard'} onClose={() => setModalType('add')} title="⚠️ 放弃修改？" darkMode={darkMode} maxWidth="max-w-xs">
+                        <div className="text-center">
+                            <p className="mb-6 text-sm" style={{color: darkMode ? '#94a3b8' : '#64748b'}}>当前内容尚未保存，确定要放弃吗？</p>
+                            <div className="flex gap-3">
+                                <button onClick={() => setModalType('add')} className="flex-1 py-2 rounded-xl font-bold text-sm" style={{backgroundColor: darkMode ? '#334155' : '#f1f5f9', color: darkMode ? '#fff' : '#475569'}}>继续编辑</button>
+                                <button onClick={() => setModalType(null)} className="flex-1 py-2 bg-rose-500 text-white rounded-xl font-bold shadow-lg text-sm">放弃</button>
+                            </div>
+                        </div>
+                    </Modal>
+
+                    {/* Delete Confirm Modal */}
+                    <Modal isOpen={modalType === 'delete'} onClose={() => setModalType(null)} title="确定删除？" darkMode={darkMode} maxWidth="max-w-xs">
+                        <div className="text-center">
+                            <p className="mb-6 text-sm" style={{color: darkMode ? '#94a3b8' : '#64748b'}}>这条笔记将被永久移除。</p>
+                            <div className="flex gap-3">
+                                <button onClick={() => setModalType(null)} className="flex-1 py-2 rounded-xl font-bold text-sm" style={{backgroundColor: darkMode ? '#334155' : '#f1f5f9', color: darkMode ? '#fff' : '#475569'}}>取消</button>
+                                <button onClick={handleDelete} className="flex-1 py-2 bg-rose-500 text-white rounded-xl font-bold shadow-lg text-sm">删除</button>
+                            </div>
+                        </div>
+                    </Modal>
+
+                    {/* Import Modal */}
+                    <Modal isOpen={modalType === 'import'} onClose={() => setModalType(null)} title="数据导入" darkMode={darkMode}>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-xs font-bold block mb-2" style={{color: darkMode ? '#94a3b8' : '#cbd5e1'}}>恢复数据</label>
+                                <div className="flex gap-3">
+                                    <button onClick={() => fileInputRef.current.click()} className="w-full py-2 rounded-lg text-sm font-bold transition-transform hover:scale-[1.02]" style={{backgroundColor: 'var(--accent-color)', color: '#ffffff'}}>选择备份文件 (.json)</button>
+                                </div>
+                                <p className="text-xs mt-2 opacity-60">提示：支持恢复分类、图标及专注时长 (新版有效)</p>
+                            </div>
+                        </div>
+                    </Modal>
+                    
+                    {/* 2. 新增：Bug 记录 Modal */}
+                    <Modal isOpen={modalType === 'bugList'} onClose={() => {setModalType(null); setEditingBugId(null); setTempBugText('');}} title="🐞 捉虫记" darkMode={darkMode}>
+                         <div className="space-y-4">
+                             <div className="flex gap-2">
+                                 <input autoFocus value={newBug} onChange={e=>setNewBug(e.target.value)} placeholder="发现了什么 Bug..." className="flex-1 border-none rounded-xl px-4 py-2 text-sm bg-slate-100 dark:bg-slate-800 focus:ring-2 outline-none" 
+                                    onKeyDown={e => e.key === 'Enter' && handleAddBug()}
+                                 />
+                                 <button onClick={handleAddBug} className="px-4 rounded-xl font-bold text-sm bg-slate-900 text-white dark:bg-white dark:text-slate-900">记录</button>
+                             </div>
+                             
+                             <div className="max-h-60 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                                 {bugs.length === 0 ? (
+                                     <div className="text-center py-8 text-xs opacity-40">暂无 Bug，系统运行良好！✨</div>
+                                 ) : (
+                                     bugs.map(bug => (
+                                         <div key={bug.id} className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 flex justify-between items-start group">
+                                             {editingBugId === bug.id ? (
+                                                 <div className="flex-1 flex gap-2">
+                                                     <input 
+                                                         autoFocus
+                                                         className="flex-1 bg-white dark:bg-slate-900 rounded px-2 py-1 text-sm border focus:ring-1 outline-none"
+                                                         value={tempBugText}
+                                                         onChange={(e) => setTempBugText(e.target.value)}
+                                                         onKeyDown={(e) => {
+                                                             if (e.key === 'Enter') saveEditBug();
+                                                             if (e.key === 'Escape') { setEditingBugId(null); setTempBugText(''); }
+                                                         }}
+                                                     />
+                                                     <button onClick={saveEditBug} className="text-emerald-500 hover:text-emerald-600"><Icons.Check size={16}/></button>
+                                                     <button onClick={() => { setEditingBugId(null); setTempBugText(''); }} className="text-slate-400 hover:text-slate-500"><Icons.X size={16}/></button>
+                                                 </div>
+                                             ) : (
+                                                 <>
+                                                     <div className="flex-1 cursor-pointer" onDoubleClick={() => startEditBug(bug)}>
+                                                         <div className="text-sm font-medium break-all">{bug.text}</div>
+                                                         <div className="text-[10px] opacity-40 mt-1">{bug.date}</div>
+                                                     </div>
+                                                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                         <button onClick={() => startEditBug(bug)} className="text-slate-300 hover:text-blue-500"><Icons.Edit size={12}/></button>
+                                                         <button onClick={() => handleDeleteBug(bug.id)} className="text-slate-300 hover:text-rose-500"><Icons.Trash size={12}/></button>
+                                                     </div>
+                                                 </>
+                                             )}
+                                         </div>
+                                     ))
+                                 )}
+                             </div>
+                             
+                             <div className="text-xs opacity-60 pt-2 border-t dark:border-slate-700 flex justify-between items-center">
+                                 <span>共 {bugs.length} 个待修复</span>
+                                 {bugs.length > 0 && (
+                                     <button onClick={() => setModalType('confirmClearBugs')} className="text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30 px-2 py-1 rounded transition-colors flex items-center gap-1 font-bold">
+                                         <Icons.Trash size={12}/> 一键清空
+                                     </button>
+                                 )}
+                             </div>
+                          </div>
+                    </Modal>
+                    
+                    {/* Confirm Clear Bugs Modal - 更新后的确认弹窗 */}
+                    <Modal isOpen={modalType === 'confirmClearBugs'} onClose={() => setModalType('bugList')} title="✨ 全部搞定？" darkMode={darkMode} maxWidth="max-w-xs">
+                        <div className="text-center">
+                            <div className="w-16 h-16 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                                <Icons.Check size={32} />
+                            </div>
+                            <h3 className="font-bold text-lg mb-2" style={{color: darkMode ? '#fff' : '#1e293b'}}>太棒了！</h3>
+                            <p className="mb-6 text-sm" style={{color: darkMode ? '#94a3b8' : '#64748b'}}>
+                                确认列表里的 Bug 都已经<br/>
+                                <b>检查并修复</b> 完毕了吗？<br/>
+                                <span className="text-xs opacity-80 mt-2 block">(清空后将重新开始记录)</span>
+                            </p>
+                            <div className="flex gap-3">
+                                <button onClick={() => setModalType('bugList')} className="flex-1 py-3 rounded-xl font-bold transition-colors" style={{backgroundColor: darkMode ? '#334155' : '#f1f5f9', color: darkMode ? '#fff' : '#475569'}}>再检查下</button>
+                                <button onClick={handleClearBugs} className="flex-1 py-3 bg-emerald-500 text-white rounded-xl font-bold shadow-lg hover:bg-emerald-600 transition-transform hover:scale-105">是的，清空！</button>
+                            </div>
+                        </div>
+                    </Modal>
+
+                    {/* 提醒弹窗 (每小时) */}
+                    <Modal isOpen={modalType === 'reminder'} onClose={() => setModalType(null)} title="⏰ 休息一下吧！" darkMode={darkMode} showCloseBtn={false}>
+                        <div className="text-center py-6 px-4">
+                            <div className="w-24 h-24 bg-white rounded-full mx-auto mb-6 flex items-center justify-center pulse-border shadow-lg" style={{backgroundColor: darkMode ? '#334155' : 'white'}}>
+                                <Icons.Coffee size={48} className="text-rose-400" />
+                            </div>
+                            <h3 className="text-xl font-bold mb-3" style={{color: darkMode ? '#fff' : '#1e293b'}}>已经过去一小时啦 ~</h3>
+                            <p className="mb-8 opacity-80" style={{color: darkMode ? '#cbd5e1' : '#475569'}}>
+                                起来活动一下，喝口水，眺望远方。<br/>
+                                也不要忘记点一下“保存备份”哦！
+                            </p>
+                            <button onClick={() => setModalType(null)} className="px-8 py-3 rounded-full font-bold shadow-lg hover:scale-105 transition-transform" style={{backgroundColor: 'var(--accent-color)', color: 'white'}}>
+                                我知道了 ({reminderCountdown}s)
+                            </button>
+                            <p className="mt-4 text-xs opacity-40">按 ESC 也可关闭</p>
+                        </div>
+                    </Modal>
+
+                    <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        style={{ display: 'none' }} 
+                        onChange={handleImport} 
+                        accept=".json" 
+                    />
+
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
